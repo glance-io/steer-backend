@@ -1,4 +1,4 @@
-from typing import Annotated
+from typing import Annotated, List
 
 from fastapi import Depends, APIRouter
 from app.services.rewrite_service import RewriteService
@@ -21,5 +21,5 @@ def rephrase(rephrase_service: Annotated[RewriteService, Depends(RewriteService)
 
 
 @router.get("/highlight")
-def highlight(highlighting_service: Annotated[TextHighlightingService, Depends(TextHighlightingService)]):
+def highlight(highlighting_service: Annotated[TextHighlightingService, Depends(TextHighlightingService)]) -> List[int]:
     return highlighting_service.create_highlight_list()
