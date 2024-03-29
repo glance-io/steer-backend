@@ -14,3 +14,4 @@ class RephraseRequest(PydanticBaseModel):
     text: str
     app_name: Optional[str] = None
     ls_order_product_id: str
+    prev_rewrites: Optional[list] = None

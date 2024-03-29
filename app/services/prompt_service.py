@@ -1,6 +1,10 @@
-from typing import Optional
+from typing import Optional, List
+
+import structlog
 
 from app.models.completion import RephraseTaskType
+
+logger = structlog.get_logger(__name__)
 
 
 class PromptService:
@@ -38,8 +42,21 @@ class PromptService:
                         or if it is already spelled correctly, respond with the same word. 
                         Reply with only the word. Here is the word: """
 
-    def get_prompt(self, task_type: RephraseTaskType, is_one_word: Optional[bool] = False):
+    def get_prompt(
+            self,
+            task_type: RephraseTaskType,
+            is_one_word: Optional[bool] = False,
+            prev_rewrites: List[str] = None
+    ) -> str:
         if is_one_word:
             return "\n\n".join([self._base_system_prompt, self._one_word_prompt])
         action = self._action_mapping.get(task_type)
+        if prev_rewrites:
+            logger.info("Adding previous rewrites to the prompt", prev_rewrites=prev_rewrites)
+            action = (
+                    action + "\n" +
+                    "These were the previously revised texts which user wasn't happy with, generate different rewrites with similar meaning: "
+                    + "\n".join(prev_rewrites)
+            )
+
         return "\n\n".join([self._base_system_prompt, action or ""])
