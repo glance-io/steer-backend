@@ -1,3 +1,4 @@
+import sentry_sdk
 import structlog
 
 from app.models.completion import RephraseTaskType, RephraseRequest
@@ -44,4 +45,5 @@ class RewriteService:
             await self.usage_service.update_user_usage(conversation_messages)
         except Exception as e:
             logger.error("Failed to update user usage", error=str(e))
+            sentry_sdk.capture_exception(e)
             pass
