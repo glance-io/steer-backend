@@ -42,15 +42,20 @@ class PromptService:
                         or if it is already spelled correctly, respond with the same word. 
                         Reply with only the word. Here is the word: """
 
+    _context_prompt = """The text and the tone should be appropriate for {}, while also blending in the user's tone of voice from the provided text."""
+
     def get_prompt(
             self,
             task_type: RephraseTaskType,
             is_one_word: Optional[bool] = False,
-            prev_rewrites: List[str] = None
+            prev_rewrites: List[str] = None,
+            application: Optional[str] = None
     ) -> str:
         if is_one_word:
             return "\n\n".join([self._base_system_prompt, self._one_word_prompt])
         action = self._action_mapping.get(task_type)
+        if application:
+            action += "\n" + self._context_prompt.format(application)
         if prev_rewrites:
             logger.info("Adding previous rewrites to the prompt", prev_rewrites=prev_rewrites)
             action = (

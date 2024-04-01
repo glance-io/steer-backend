@@ -23,7 +23,8 @@ class RewriteService:
         prompt = self.prompt_service.get_prompt(
             self.rewrite_request.completion_task_type,
             len(self.rewrite_request.text.split(" ")) == 1,
-            self.rewrite_request.prev_rewrites
+            self.rewrite_request.prev_rewrites,
+            self.rewrite_request.app_name
         )
         conversation_messages = [
             SystemMessage(content=prompt),
