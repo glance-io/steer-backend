@@ -1,3 +1,5 @@
+from typing import Optional
+
 import sentry_sdk
 import structlog
 
@@ -19,7 +21,23 @@ class RewriteService:
         self.rewrite_request = rewrite_request
         self.usage_service = LemonSqueezyUsageService(rewrite_request.ls_order_product_id)
 
-    async def rewrite(self):
+    @staticmethod
+    def _format_token(token, use_sse: bool):
+        if use_sse:
+            return {
+                "data": token,
+                "event": "data"
+            }
+        return token
+
+    @staticmethod
+    def _sse_end_of_stream():
+        return {
+            "data": "end of stream",
+            "event": "eos"
+        }
+
+    async def rewrite(self, sse_formating: Optional[bool] = True):
         logger.info("Rewriting started", task=self.rewrite_request.completion_task_type)
         prompt = self.prompt_service.get_prompt(
             self.rewrite_request.completion_task_type,
@@ -38,7 +56,11 @@ class RewriteService:
         async for response_delta in response_generator:
             if response_delta:
                 rewrite += response_delta
-                yield response_delta
+                yield self._format_token(response_delta, sse_formating)
+        if sse_formating:
+            yield self._sse_end_of_stream()
+            logger.debug('sse eos')
+
         logger.info("Rewrite completed", rewrite=rewrite, original_text=self.rewrite_request.text)
         conversation_messages.append(AssistantMessage(content=rewrite))
         try:
