@@ -8,7 +8,7 @@ from app.models.message import SystemMessage, UserMessage, AssistantMessage
 from app.services.openai_service import AsyncOpenAIService
 from app.services.prompt_service import PromptService
 from app.services.usage_service import LemonSqueezyUsageService, BaseUsageService
-
+from app.settings import settings
 
 logger = structlog.get_logger(__name__)
 
@@ -37,6 +37,12 @@ class RewriteService:
             "event": "eos"
         }
 
+    @staticmethod
+    def __get_temperature(task_type: RephraseTaskType):
+        return settings.fix_grammar_temperature \
+            if task_type == RephraseTaskType.FIX_GRAMMAR\
+            else settings.rephrase_temperature
+
     async def rewrite(self, sse_formating: Optional[bool] = True):
         logger.info("Rewriting started", task=self.rewrite_request.completion_task_type)
         prompt = self.prompt_service.get_prompt(
@@ -50,7 +56,8 @@ class RewriteService:
             UserMessage(content=self.rewrite_request.text)
         ]
         response_generator = self.openai_service.stream_completions(
-            messages = conversation_messages
+            messages = conversation_messages,
+            temperature=self.__get_temperature(self.rewrite_request.completion_task_type)
         )
         rewrite = ""
         async for response_delta in response_generator:
