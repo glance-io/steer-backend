@@ -51,7 +51,6 @@ class RewriteService:
             self.rewrite_request.prev_rewrites,
             self.rewrite_request.app_name
         )
-        logger.debug("Prompt generated", prompt=prompt)
         conversation_messages = [
             SystemMessage(content=prompt),
             UserMessage(content=self.rewrite_request.text)
