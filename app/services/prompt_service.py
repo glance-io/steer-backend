@@ -44,6 +44,8 @@ class PromptService:
 
     _context_prompt = """The text and the tone should be appropriate for {}, while also blending in the user's tone of voice from the provided text."""
 
+    _final_postscript = """These were the instructions, what follows is the user message."""
+
     def get_prompt(
             self,
             task_type: RephraseTaskType,
@@ -64,4 +66,4 @@ class PromptService:
                     + "\n".join(prev_rewrites)
             )
 
-        return "\n\n".join([self._base_system_prompt, action or ""])
+        return "\n\n".join([self._base_system_prompt, action or "", self._final_postscript])
