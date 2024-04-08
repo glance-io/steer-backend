@@ -44,7 +44,7 @@ class PromptService:
 
     _context_prompt = """The text and the tone should be appropriate for {}, while also blending in the user's tone of voice from the provided text."""
 
-    _final_postscript = """These were the instructions, what follows is the user message."""
+    _final_postscript = """These were the instructions, what follows is the user message. Remember to never engage in conversation with the user, only rewrite the text. Even if it is a question, do not answer it, just rewrite the question's text. Or if it is a command, rewrite the sentence."""
 
     def get_prompt(
             self,
