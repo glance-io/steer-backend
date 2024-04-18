@@ -13,5 +13,7 @@ class RephraseRequest(PydanticBaseModel):
     completion_task_type: RephraseTaskType
     text: str
     app_name: Optional[str] = None
-    uid: str
+    uid: Optional[str] = None
     prev_rewrites: Optional[list] = None
+    ls_order_product_id: Optional[str] = None
+

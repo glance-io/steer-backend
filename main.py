@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from app.api.completion import router as completion_router
-from app.api.usage import router as usage_router
+from app.api.usage import  router as usage_router
 import sentry_sdk
 from app.settings import settings
 
@@ -17,7 +17,6 @@ sentry_sdk.init(
 
 app = FastAPI()
 
-app = FastAPI()
 app.include_router(completion_router)
 app.include_router(usage_router)
 

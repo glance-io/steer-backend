@@ -7,6 +7,7 @@ from app.models.completion import RephraseTaskType, RephraseRequest
 from app.models.message import SystemMessage, UserMessage, AssistantMessage
 from app.services.openai_service import AsyncOpenAIService
 from app.services.prompt_service import PromptService
+from app.services.usage.lemonsqueezy import LemonSqueezyUsageService
 from app.services.usage.mixpannel import MixpanelUsageService
 from app.settings import settings
 
@@ -21,6 +22,8 @@ class RewriteService:
         self.rewrite_request = rewrite_request
         self.usage_service = MixpanelUsageService(
             rewrite_request.uid
+        ) if rewrite_request.uid else LemonSqueezyUsageService(
+            rewrite_request.ls_order_product_id
         )
 
     @staticmethod
