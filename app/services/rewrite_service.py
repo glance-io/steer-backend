@@ -7,7 +7,7 @@ from app.models.completion import RephraseTaskType, RephraseRequest
 from app.models.message import SystemMessage, UserMessage, AssistantMessage
 from app.services.openai_service import AsyncOpenAIService
 from app.services.prompt_service import PromptService
-from app.services.usage_service import LemonSqueezyUsageService, BaseUsageService
+from app.services.usage.mixpannel import MixpanelUsageService
 from app.settings import settings
 
 logger = structlog.get_logger(__name__)
@@ -19,7 +19,9 @@ class RewriteService:
 
     def __init__(self, rewrite_request: RephraseRequest):
         self.rewrite_request = rewrite_request
-        self.usage_service = LemonSqueezyUsageService(rewrite_request.ls_order_product_id)
+        self.usage_service = MixpanelUsageService(
+            rewrite_request.uid
+        )
 
     @staticmethod
     def _format_token(token, use_sse: bool):

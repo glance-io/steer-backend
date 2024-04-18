@@ -3,7 +3,8 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 
 from app.models.usage import CurrentUsage
-from app.services.usage_service import BaseUsageService, LemonSqueezyUsageService
+from app.services.usage.base import BaseUsageService
+from app.services.usage.lemonsqueezy import LemonSqueezyUsageService
 
 router = APIRouter(prefix="/usage", tags=["usage"])
 

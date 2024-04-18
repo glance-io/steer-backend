@@ -1,0 +1,29 @@
+from typing import List
+
+from app.models.message import BaseChatMessage
+from app.services.usage.base import BaseUsageService
+from mixpanel import Mixpanel
+from app.settings import settings
+
+
+class MixpanelUsageService(BaseUsageService):
+    def __init__(self, uid: str):
+        super().__init__(uid)
+        self.mixpanel_client = Mixpanel(
+            settings.mixpanel_api_key
+        )
+
+    async def get_user_usage(self):
+        raise NotImplemented(
+            "usage can be obtained in Mixpanel"
+        )
+
+    async def update_user_usage(self, messages: List[BaseChatMessage]):
+        token_usage = self.get_conversation_tokens(messages)
+        self.mixpanel_client.track(
+            self.uid,
+            "token-usage",
+            {
+                "usage_delta": token_usage
+            }
+        )

@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     sentry_dsn: str
     rephrase_temperature: float = 1
     fix_grammar_temperature: float = 1
+    mixpanel_api_key: str
 
     class Config:
         env_file = get_project_root() / ".env"
