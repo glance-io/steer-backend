@@ -1,9 +1,13 @@
 from typing import List
 
+import structlog
+
 from app.models.message import BaseChatMessage
 from app.services.usage.base import BaseUsageService
 from mixpanel import Mixpanel
 from app.settings import settings
+
+logger = structlog.get_logger(__name__)
 
 
 class MixpanelUsageService(BaseUsageService):
@@ -27,3 +31,4 @@ class MixpanelUsageService(BaseUsageService):
                 "usage_delta": token_usage
             }
         )
+        logger.info("Updated user token usage", uid=self.uid, usage_delta=token_usage)
