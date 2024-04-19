@@ -56,7 +56,7 @@ class PromptService:
         if is_one_word:
             return "\n\n".join([self._base_system_prompt, self._one_word_prompt])
         action = self._action_mapping.get(task_type)
-        if application:
+        if application and task_type == RephraseTaskType.REPHRASE:
             action += "\n" + self._context_prompt.format(application)
         if prev_rewrites:
             logger.info("Adding previous rewrites to the prompt", prev_rewrites=prev_rewrites)
