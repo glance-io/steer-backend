@@ -1,9 +1,8 @@
 ![Logo Banner](logo_banner.png)
 # Steer
 
-This is a backend service for grammar AI assistant [Steer](steerapp.ai). The service is built with FastAPI and its goal is to build a prompt for user's tasks, send it to an LLM provider and stream the response.
-
-Aside from running your own fix grammar service, this repo can serve as an inspiration for streaming responses from LLM models and building SSE(Server Sent Events) applications.
+Lightweight backend service for grammar assistant app.
+Can serve as an inspiration for LLM token streaming with OpenAI SDK and FastAPI.
 
 ## Getting Started
 
