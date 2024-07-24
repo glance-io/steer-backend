@@ -1,4 +1,6 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
 from app.api.completion import router as completion_router
 from app.api.usage import  router as usage_router
 import sentry_sdk
@@ -16,6 +18,14 @@ sentry_sdk.init(
 )
 
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 app.include_router(completion_router)
 app.include_router(usage_router)
