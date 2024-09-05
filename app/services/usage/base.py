@@ -10,7 +10,7 @@ logger = structlog.get_logger(__name__)
 
 
 class BaseUsageService:
-    model = settings.openai_model
+    model = settings.llm_model
 
     def __init__(self, uid: str):
         self.uid = uid

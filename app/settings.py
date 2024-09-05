@@ -1,11 +1,16 @@
 from app.models.prompt import PromptsConfig
 from app.utils.filesystem import get_project_root
 from pydantic_settings import BaseSettings, SettingsConfigDict, PydanticBaseSettingsSource, YamlConfigSettingsSource
+from enum import Enum
 
+class LLMProvider(str, Enum):
+    OPENAI = "openai"
+    ANTHROPIC = "anthropic"
 
 class Settings(BaseSettings):
-    openai_api_key: str
-    openai_model: str
+    llm_api_key: str
+    llm_model: str
+    llm_provider: LLMProvider = LLMProvider.OPENAI
     lemonsqueezy_api_key: str
     sentry_dsn: str
     rephrase_temperature: float = 1
@@ -28,6 +33,5 @@ class Settings(BaseSettings):
         file_secret_settings: PydanticBaseSettingsSource,
     ) -> tuple[PydanticBaseSettingsSource, ...]:
         return init_settings, env_settings, dotenv_settings, YamlConfigSettingsSource(settings_cls)
-
 
 settings = Settings()
