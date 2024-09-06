@@ -75,9 +75,9 @@ class RewriteService:
 
         logger.info("Rewrite completed", rewrite=rewrite, original_text=self.rewrite_request.text)
         conversation_messages.append(AssistantMessage(content=rewrite))
-        try:
-            await self.usage_service.update_user_usage(conversation_messages)
-        except Exception as e:
-            logger.error("Failed to update user usage", error=str(e))
-            sentry_sdk.capture_exception(e)
-            pass
+        # try:
+        #     await self.usage_service.update_user_usage(conversation_messages)
+        # except Exception as e:
+        #     logger.error("Failed to update user usage", error=str(e))
+        #     sentry_sdk.capture_exception(e)
+        #     pass
