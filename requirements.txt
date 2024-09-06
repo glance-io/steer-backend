@@ -1,4 +1,5 @@
 annotated-types==0.6.0
+anthropic==0.34.2
 anyio==4.3.0
 certifi==2024.2.2
 charset-normalizer==3.3.2
@@ -26,6 +27,7 @@ sse-starlette==2.0.0
 starlette==0.36.3
 structlog==24.1.0
 tiktoken==0.7.0
+tokenizers==0.20.0
 tqdm==4.66.2
 typing_extensions==4.10.0
 urllib3==2.2.1
