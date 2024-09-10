@@ -13,6 +13,7 @@ class PromptService:
     _action_mapping = {
         RephraseTaskType.REPHRASE: _prompts.rephrase_prompt,
         RephraseTaskType.FIX_GRAMMAR: _prompts.fix_grammar_prompt,
+        RephraseTaskType.CONCISE: _prompts.concise_prompt
     }
 
     def get_prompt(

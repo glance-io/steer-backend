@@ -7,6 +7,7 @@ from pydantic import BaseModel as PydanticBaseModel
 class RephraseTaskType(str, Enum):
     FIX_GRAMMAR = "fix_grammar"
     REPHRASE = "rephrase"
+    CONCISE = "concise"
 
 
 class RephraseRequest(PydanticBaseModel):
