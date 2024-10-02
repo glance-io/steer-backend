@@ -3,7 +3,7 @@ from typing import List
 import structlog
 
 from app.models.message import BaseChatMessage
-from app.services.usage.base import BaseUsageService
+from app.services.usage.token_based.base import BaseUsageService
 from mixpanel import Mixpanel
 from app.settings import settings
 

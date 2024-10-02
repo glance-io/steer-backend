@@ -4,7 +4,7 @@ import httpx
 
 from app.models.message import BaseChatMessage
 from app.models.usage import CurrentUsage
-from app.services.usage.base import BaseUsageService, logger
+from app.services.usage.token_based.base import BaseUsageService, logger
 from app.settings import settings
 
 
