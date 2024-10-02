@@ -1,14 +1,13 @@
 from typing import Optional, AsyncGenerator
 
-import sentry_sdk
 import structlog
 
 from app.models.completion import RephraseTaskType, RephraseRequest
 from app.models.message import SystemMessage, UserMessage, AssistantMessage
 from app.services.llm_service import LLMServiceBase
 from app.services.prompt_service import PromptService
-from app.services.usage.lemonsqueezy import LemonSqueezyUsageService
-from app.services.usage.mixpannel import MixpanelUsageService
+from app.services.usage.token_based.lemonsqueezy import LemonSqueezyUsageService
+from app.services.usage.token_based.mixpannel import MixpanelUsageService
 from app.settings import settings
 
 logger = structlog.get_logger(__name__)
