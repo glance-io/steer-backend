@@ -12,6 +12,6 @@ class BaseDBConnectionService(ABC, metaclass=AbstractSingleton):
 
     async def connect(self):
         if self.db is None:
-            return self._connect()
+            return await self._connect()
         return self.db
 
