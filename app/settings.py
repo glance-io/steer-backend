@@ -11,6 +11,7 @@ class LLMProvider(str, Enum):
 
 
 class Settings(BaseSettings):
+    debug: bool = True
     llm_api_key: str
     llm_model: str
     llm_provider: LLMProvider = LLMProvider.OPENAI
