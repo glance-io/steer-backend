@@ -2,6 +2,7 @@ import asyncio
 import datetime
 from typing import Tuple
 
+import sentry_sdk
 import structlog
 from postgrest import APIError
 from sentry_sdk import capture_exception
@@ -31,12 +32,16 @@ class FreeTierUsageServiceWithCache(BaseFreeTierUsageService):
 
     async def _is_user_premium_db(self, user_id: str) -> Tuple[bool, datetime.datetime | None]:
         try:
-            resp = await self.db.table("users").select(
-                "id",
-                "is_subscription_active:subscription(is_active)",
-                "valid_until:subscription_payments(valid_until.max())"
-            ).eq("id", user_id).single().execute()
-            return resp.data["is_subscription_active"]
+            resp = await self.db.table("subscription_payments").select(
+                "valid_until"
+            ).eq(
+                "user_id", user_id
+            ).gt(
+                "valid_until", datetime.datetime.now().isoformat()
+            ).limit(1).execute()
+            is_active = bool(resp.data)
+            valid_until = resp.data[0].get("valid_until") if is_active else None
+            return is_active, valid_until
         except APIError as e:
             if e.code == "PGRST116":
                 logger.warning("User not found", user_id=user_id)
@@ -47,15 +52,15 @@ class FreeTierUsageServiceWithCache(BaseFreeTierUsageService):
             return False, None
 
     async def is_user_premium(self, user_id: str) -> bool:
-        is_premium = await self.cache.get(self._premium_key(user_id))
+        is_premium = bool(await self.cache.get(self._premium_key(user_id)))
         if is_premium is None:
             is_premium, valid_until = await self._is_user_premium_db(user_id)
             if is_premium and valid_until and valid_until > datetime.datetime.now():
-                ttl = (valid_until - datetime.datetime.now()).total_seconds()
-                await self.cache.set(self._premium_key(user_id), is_premium, ttl=ttl)
+                ttl = int((valid_until - datetime.datetime.now()).total_seconds())
+                await self.cache.set(self._premium_key(user_id), bytes(is_premium), ttl=ttl)
             else:
                 is_premium = False
-            await self.cache.set(self._premium_key(user_id), is_premium)
+                await self.cache.set(self._premium_key(user_id), bytes(is_premium), ttl=60*60)   # Effectively is premium is False, cache for 1 hour. Webhook will update it
         return is_premium
 
     async def is_user_allowed(self, user_id: str) -> bool:
@@ -79,7 +84,9 @@ class FreeTierUsageServiceWithCache(BaseFreeTierUsageService):
                 return 0, None
             data = resp.data[0]
 
-            if data["time_to"] < datetime.datetime.now() >= data["time_from"]:
+            time_to = datetime.datetime.fromisoformat(data["time_to"])
+
+            if time_to < datetime.datetime.now() >= data["time_from"]:
                 return data["usage"]
             return 0, None
         except APIError as e:
@@ -98,11 +105,32 @@ class FreeTierUsageServiceWithCache(BaseFreeTierUsageService):
         if usage is None:
             usage, time_to = await self._get_user_usage_db(user_id)
             if time_to and time_to > datetime.datetime.now():
-                ttl = (time_to - datetime.datetime.now()).total_seconds()
+                ttl = int((time_to - datetime.datetime.now()).total_seconds())
                 await self.cache.set(self._usage_key(user_id), usage, ttl=ttl)
-            else:
-                await self.cache.set(self._usage_key(user_id), usage)
-        return usage
+        return int(usage)
+
+    async def _update_user_usage_db(self, user_id: str, usage_delta: int) -> Tuple[int, datetime.datetime]:
+        resp = await self.db.rpc("update_or_insert_period_usage", {
+            "p_uid": user_id,
+            "p_date": datetime.datetime.now().isoformat(),
+            "p_delta": usage_delta,
+        }).execute()
+        if not resp.data:
+            raise ValueError("Failed to update user usage")
+        usage = resp.data[0]
+        return usage.get("usage", 0), datetime.datetime.fromisoformat(usage.get("time_to"))
 
     async def update_user_usage(self, user_id: str, usage_delta: int):
-        raise NotImplementedError()
+        logger.info("Updating user usage", user_id=user_id, usage_delta=usage_delta)
+        usage_cache = await self.get_user_usage(user_id)
+        exists = usage_cache is not None
+        if exists:
+            await self.cache.incr(self._usage_key(user_id), usage_delta)
+
+        usage, time_to = await self._update_user_usage_db(user_id, usage_delta)
+        logger.debug("Updated user usage in db", user_id=user_id, usage=usage, time_to=time_to)
+        ttl = int((time_to - datetime.datetime.now()).total_seconds())
+        if usage != usage_cache + usage_delta:
+            logger.warning("Usage mismatch", user_id=user_id, usage=usage, usage_cache=usage_cache, usage_delta=usage_delta)
+            sentry_sdk.capture_message(f"Usage mismatch for user {user_id}", level="warning")
+        await self.cache.set(self._usage_key(user_id), usage, ttl=ttl)
