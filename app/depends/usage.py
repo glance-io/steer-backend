@@ -5,8 +5,9 @@ from app.services.usage.free_tier_usage.free_tier_usage_service_with_cache impor
 
 
 async def get_usage_service() -> BaseFreeTierUsageService:
+    db = await SupabaseConnectionService().connect()
     service = FreeTierUsageServiceWithCache(
         cache=RedisCacheService(),
-        db=await SupabaseConnectionService().connect()
+        db=db
     )
     return service
