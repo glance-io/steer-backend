@@ -62,6 +62,33 @@ class RedisCacheService(BaseCacheService):
             print(f"Error updating value for key {key}: {e}")
             return False
 
+    async def incr(self, key: str, amount: int = 1) -> int:
+        if not self.redis:
+            raise RuntimeError("Redis connection not established")
+        try:
+            return await self.redis.incr(key, amount)
+        except Exception as e:
+            print(f"Error incrementing key {key}: {e}")
+            return -1
+
+    async def get_ttl(self, key: str) -> int:
+        if not self.redis:
+            raise RuntimeError("Redis connection not established")
+        try:
+            return await self.redis.ttl(key)
+        except Exception as e:
+            print(f"Error getting TTL for key {key}: {e}")
+            return -1
+
+    async def exists(self, key: str) -> bool:
+        if not self.redis:
+            raise RuntimeError("Redis connection not established")
+        try:
+            return await self.redis.exists(key)
+        except Exception as e:
+            print(f"Error checking if key exists {key}: {e}")
+            return False
+
 
 if __name__ == '__main__':
     class_a = RedisCacheService()

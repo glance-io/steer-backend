@@ -1,11 +1,12 @@
+import asyncio
 from typing import Optional, AsyncGenerator
 
 import structlog
-
 from app.models.completion import RephraseTaskType, RephraseRequest
 from app.models.message import SystemMessage, UserMessage, AssistantMessage
 from app.services.llm_service import LLMServiceBase
 from app.services.prompt_service import PromptService
+from app.services.usage.free_tier_usage.base import BaseFreeTierUsageService
 from app.services.usage.token_based.lemonsqueezy import LemonSqueezyUsageService
 from app.services.usage.token_based.mixpannel import MixpanelUsageService
 from app.settings import settings
@@ -16,14 +17,15 @@ logger = structlog.get_logger(__name__)
 class RewriteService:
     prompt_service = PromptService()
 
-    def __init__(self, rewrite_request: RephraseRequest, llm_service: LLMServiceBase):
+    def __init__(
+            self,
+            rewrite_request: RephraseRequest,
+            llm_service: LLMServiceBase,
+            usage_service: BaseFreeTierUsageService
+    ):
         self.rewrite_request = rewrite_request
         self.llm_service = llm_service
-        self.usage_service = MixpanelUsageService(
-            rewrite_request.uid
-        ) if rewrite_request.uid else LemonSqueezyUsageService(
-            rewrite_request.ls_order_product_id
-        )
+        self.usage_service = usage_service
 
     @staticmethod
     def _format_token(token, use_sse: bool):
@@ -39,6 +41,13 @@ class RewriteService:
         return {
             "data": "end of stream",
             "event": "eos"
+        }
+
+    @staticmethod
+    def _sse_throttle():
+        return {
+            "data": "throttle",
+            "event": "throttle"
         }
 
     @staticmethod
@@ -59,12 +68,20 @@ class RewriteService:
             SystemMessage(content=prompt),
             UserMessage(content=self.rewrite_request.text)
         ]
+        is_user_allowed = await self.usage_service.is_user_allowed(
+            user_id=self.rewrite_request.uid,
+        )
+        if not is_user_allowed:
+            yield self._sse_throttle()
+            await asyncio.sleep(5)
+
         response_generator = self.llm_service.generate_stream(
             messages=conversation_messages,
             temperature=self.__get_temperature(self.rewrite_request.completion_task_type)
         )
         rewrite = ""
         async for response_delta in response_generator:
+
             if response_delta:
                 rewrite += response_delta
                 yield self._format_token(response_delta, sse_formating)
@@ -74,9 +91,7 @@ class RewriteService:
 
         logger.info("Rewrite completed", rewrite=rewrite, original_text=self.rewrite_request.text)
         conversation_messages.append(AssistantMessage(content=rewrite))
-        # try:
-        #     await self.usage_service.update_user_usage(conversation_messages)
-        # except Exception as e:
-        #     logger.error("Failed to update user usage", error=str(e))
-        #     sentry_sdk.capture_exception(e)
-        #     pass
+        await asyncio.create_task(self.usage_service.update_user_usage(
+            user_id=self.rewrite_request.uid,
+            usage_delta=1
+        ))

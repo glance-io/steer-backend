@@ -19,3 +19,11 @@ class BaseCacheService(ABC, metaclass=AbstractSingleton):
     @abstractmethod
     async def update(self, key: str, value: any):
         raise NotImplementedError()
+
+    @abstractmethod
+    async def incr(self, key: str, amount: int = 1):
+        raise NotImplementedError()
+
+    @abstractmethod
+    async def exists(self, key: str):
+        raise NotImplementedError()
