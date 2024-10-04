@@ -81,10 +81,11 @@ class RewriteService:
         )
         rewrite = ""
         async for response_delta in response_generator:
-
             if response_delta:
                 rewrite += response_delta
                 yield self._format_token(response_delta, sse_formating)
+                if not is_user_allowed:
+                    await asyncio.sleep(0.4)
         if sse_formating:
             yield self._sse_end_of_stream()
             logger.debug('sse eos')
