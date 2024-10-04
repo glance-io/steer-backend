@@ -17,7 +17,17 @@ logger = structlog.get_logger(__name__)
 
 
 @router.post("/rephrase")
-async def rephrase(
+async def rephrase(request: RephraseRequest, llm_service: LLMServiceBase = Depends(get_llm_service)):
+    try:
+        rewrite_service = RewriteService(request, llm_service, None)
+        return EventSourceResponse(rewrite_service.rewrite(sse_formating=True))
+    except Exception as e:
+        logger.error(f"Error in rephrase: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/v2/rephrase")
+async def rephrase_new(
         request: RephraseRequest,
         llm_service: LLMServiceBase = Depends(get_llm_service),
         usage_service: BaseFreeTierUsageService = Depends(get_usage_service)

@@ -21,7 +21,7 @@ class RewriteService:
             self,
             rewrite_request: RephraseRequest,
             llm_service: LLMServiceBase,
-            usage_service: BaseFreeTierUsageService
+            usage_service: Optional[BaseFreeTierUsageService] = None
     ):
         self.rewrite_request = rewrite_request
         self.llm_service = llm_service
@@ -68,10 +68,15 @@ class RewriteService:
             SystemMessage(content=prompt),
             UserMessage(content=self.rewrite_request.text)
         ]
-        is_user_allowed = await self.usage_service.is_user_allowed(
-            user_id=self.rewrite_request.uid,
-        )
+        if self.usage_service:
+            is_user_allowed = await self.usage_service.is_user_allowed(
+                user_id=self.rewrite_request.uid,
+            )
+        else:
+            is_user_allowed = True
+
         if not is_user_allowed:
+            logger.debug("User over alllowance, throttling")
             yield self._sse_throttle()
             await asyncio.sleep(5)
 
