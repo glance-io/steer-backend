@@ -10,7 +10,7 @@ from supabase import AsyncClient
 
 from app.services.cache.base import BaseCacheService
 from app.services.usage.free_tier_usage.base import BaseFreeTierUsageService
-
+from app.settings import settings
 
 logger = structlog.getLogger(__name__)
 
@@ -18,7 +18,7 @@ logger = structlog.getLogger(__name__)
 class FreeTierUsageServiceWithCache(BaseFreeTierUsageService):
     _cache_usage_key = 'users:usage'
     _cache_premium_key = 'users:premium'
-    _max_usage = 10
+    _max_usage = settings.throttling_config.limit
 
     def __init__(self, cache: BaseCacheService, db: AsyncClient):
         self.cache = cache
@@ -41,6 +41,7 @@ class FreeTierUsageServiceWithCache(BaseFreeTierUsageService):
             ).limit(1).execute()
             is_active = bool(resp.data)
             valid_until = resp.data[0].get("valid_until") if is_active else None
+            valid_until = datetime.datetime.fromisoformat(valid_until) if valid_until else None
             return is_active, valid_until
         except APIError as e:
             if e.code == "PGRST116":
@@ -52,7 +53,7 @@ class FreeTierUsageServiceWithCache(BaseFreeTierUsageService):
             return False, None
 
     async def is_user_premium(self, user_id: str) -> bool:
-        is_premium = bool(await self.cache.get(self._premium_key(user_id)))
+        is_premium = await self.cache.get(self._premium_key(user_id))
         if is_premium is None:
             is_premium, valid_until = await self._is_user_premium_db(user_id)
             if is_premium and valid_until and valid_until > datetime.datetime.now():
@@ -61,7 +62,7 @@ class FreeTierUsageServiceWithCache(BaseFreeTierUsageService):
             else:
                 is_premium = False
                 await self.cache.set(self._premium_key(user_id), bytes(is_premium), ttl=60*60)   # Effectively is premium is False, cache for 1 hour. Webhook will update it
-        return is_premium
+        return bool(is_premium)
 
     async def is_user_allowed(self, user_id: str) -> bool:
         premium, usage = await asyncio.gather(
