@@ -1,9 +1,12 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from postgrest import APIError
 
-from app.models.users import SignInDTO
+from app.depends.auth import auth_dependency
+from app.models.users import SignInDTO, UserWithUsage
+from app.repository.users_repository import UsersRepository, UserDoesNotExistError
 from app.services.db.supabase import SupabaseConnectionService
 from app.services.lemon_squeezy_service import LemonSqueezyService
+from gotrue.types import User as AuthUser
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -30,3 +33,20 @@ async def sign_in(data: SignInDTO):
         instance_id=data.instance_id
     )
     return {"is_premium": is_premium}
+
+
+@router.get("{user_id}/profile")
+async def get_profile(
+        user_id: str,
+        db = Depends(SupabaseConnectionService().connect),
+        _auth_user: AuthUser = Depends(auth_dependency)
+) -> UserWithUsage:
+    repo = UsersRepository(db)
+    try:
+        return await repo.get_user_with_usage(user_id)
+    except UserDoesNotExistError:
+        raise HTTPException(status_code=404, detail="User not found")
+    except APIError as e:
+        raise HTTPException(status_code=500, detail="DB error")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
