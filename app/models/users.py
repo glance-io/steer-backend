@@ -4,9 +4,10 @@ from typing import Optional
 
 from pydantic import BaseModel
 
+from app.models.config import ThrottlingConfig
+
 
 class SignInDTO(BaseModel):
-    user_id: str | uuid.UUID
     instance_id: str
     license_key: str
 
@@ -18,6 +19,7 @@ class User(BaseModel):
     instance_id: Optional[str] = None
     subscription_id: Optional[str] = None
     is_premium: bool = False
+    tier: str
 
 
 class Usage(BaseModel):
@@ -27,4 +29,5 @@ class Usage(BaseModel):
 
 
 class UserWithUsage(User):
-    usage: Optional[Usage] = None
+    period_usage: Optional[Usage] = None
+    throttling_meta: ThrottlingConfig

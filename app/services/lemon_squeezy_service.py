@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Tuple
 
 import httpx
 import sentry_sdk
@@ -19,6 +20,7 @@ class LicenseNotActiveException(Exception):
 
 class LemonSqueezyService:
     api_url = "https://api.lemonsqueezy.com/v1"
+    subscription_active_states = {'on_trial', 'active', 'paused', 'past_due'}
 
     def __init__(self, db: AsyncClient):
         self.db = db
@@ -61,43 +63,7 @@ class LemonSqueezyService:
         subscription_response = SubscriptionResponse(**response.json())
         return subscription_response.data
 
-    async def process_and_store_subscription(
-            self,
-            user_id: str,
-            license_key: str,
-            instance_id: str,
-            subscription_detail: SubscriptionData
-    ) -> bool:
-        # FIXME: This method also handles user creation, which should be moved to a separate service
-        active_states = {'on_trial', 'active', 'paused', 'past_due'}
-        is_active = subscription_detail.attributes.status in active_states
-
-        # Update user
-        upsert_resp = await self.db.table("users").upsert({
-            "id": user_id,
-            "is_premium": is_active,
-            "license_key": license_key,
-            "subscription_id": subscription_detail.id,
-            "instance_id": instance_id
-        }, count=CountMethod.exact).execute()
-        if not upsert_resp.count:
-            raise ValueError("Failed to update user subscription")
-
-        # Update subscription
-        if is_active:
-            await self.db.table("subscription_payments").upsert({
-                "user_id": user_id,
-                "valid_from": datetime.now().isoformat(),   # technically not true, but works for our purposes
-                "valid_until": subscription_detail.attributes.renews_at.isoformat(),
-            }, count=CountMethod.exact).execute()
-        return is_active
-
-    async def pair_existing_license_with_user(self, user_id: str, license_key: str, instance_id: str):
-        # Get subscription id
-
-        # Get subscription status + payment
-        # Persist into db
-        # Profit?
+    async def pair_existing_license_with_user(self, user_id: str, license_key: str, instance_id: str) -> Tuple[SubscriptionData | None, bool]:
         try:
             async with httpx.AsyncClient(
                     headers={"Authorization": f"Bearer {settings.lemonsqueezy_api_key}"}
@@ -107,15 +73,12 @@ class LemonSqueezyService:
                     logger.info(
                         "Submitted inactive license", user_id=user_id, license_key=license_key, instance_id=instance_id
                     )
-                    return False
+                    return None, False
                 subscription_item_id = await self.__get_subscription_item_from_order_product(
                     ls_license.meta.order_item_id, client
                 )
                 subscription_detail = await self.get_subscription_detail(subscription_item_id, client)
-                is_active = await self.process_and_store_subscription(
-                    user_id, license_key, instance_id, subscription_detail
-                )
-                return is_active
+                return subscription_detail, subscription_detail.attributes.status in self.subscription_active_states
         except httpx.HTTPStatusError as e:
             logger.error(f"HTTP status Error Lemon Squeezy: {e}")
             sentry_sdk.capture_exception(e)

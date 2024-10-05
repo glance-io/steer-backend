@@ -1,4 +1,4 @@
-from app.models.config import DBConfig
+from app.models.config import DBConfig, ThrottlingConfig
 from app.models.prompt import PromptsConfig
 from app.utils.filesystem import get_project_root
 from pydantic_settings import BaseSettings, SettingsConfigDict, PydanticBaseSettingsSource, YamlConfigSettingsSource
@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     mixpanel_api_key: str
     prompts: PromptsConfig
     db_config: DBConfig
+    throttling_config: ThrottlingConfig
 
     model_config = SettingsConfigDict(
         env_file=get_project_root() / ".env",
