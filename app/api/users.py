@@ -1,8 +1,10 @@
 from fastapi import APIRouter, HTTPException, Depends
 from postgrest import APIError
+from supabase import AsyncClient
 
 from app.depends.auth import auth_dependency
 from app.models.users import SignInDTO, UserWithUsage
+from app.repository.payments_repository import PaymentsRepository
 from app.repository.users_repository import UsersRepository, UserDoesNotExistError
 from app.services.db.supabase import SupabaseConnectionService
 from app.services.lemon_squeezy_service import LemonSqueezyService
@@ -12,30 +14,38 @@ router = APIRouter(prefix="/users", tags=["users"])
 
 
 @router.post("/signin")
-async def sign_in(data: SignInDTO):
-    db = await SupabaseConnectionService().connect()
-    try:
-        user_record_respone = await db.table("users").insert({
-            'id': data.user_id,
-        }, count='exact').execute()
-        if not user_record_respone.count == 1:
-            raise HTTPException(status_code=500, detail="Failed to create user")
-    except APIError as e:
-        if e.code == '23505':
-            pass
-        else:
-            raise HTTPException(status_code=500, detail="Failed to create user", error=str(e))
-
-    ls_service = LemonSqueezyService(db=db)
-    is_premium = await ls_service.pair_existing_license_with_user(
-        user_id=data.user_id,
+async def sign_in(data: SignInDTO, db: AsyncClient = Depends(SupabaseConnectionService().connect), auth_user: AuthUser = Depends(auth_dependency)):
+    users_repo = UsersRepository(db)
+    user, created = await users_repo.get_or_create_user(
+        auth_user.id,
+        email=auth_user.email,
         license_key=data.license_key,
         instance_id=data.instance_id
     )
-    return {"is_premium": is_premium}
+
+    if created:
+        ls_service = LemonSqueezyService(db=db)
+        payments_repo = PaymentsRepository(db=db)
+        subscription_detail, is_premium = await ls_service.pair_existing_license_with_user(
+            user_id=auth_user.id,
+            license_key=data.license_key,
+            instance_id=data.instance_id
+        )
+        user = await users_repo.update_user(
+            auth_user.id,
+            is_premium=is_premium,
+            subscription_id=subscription_detail.subscription_id
+        )
+        await payments_repo.create(
+            user_id=auth_user.id,
+            valid_from=subscription_detail.valid_from,
+            valid_until=subscription_detail.valid_until
+        )
+
+    return {"is_premium": user.is_premium}
 
 
-@router.get("{user_id}/profile")
+@router.get("/{user_id}/profile")
 async def get_profile(
         user_id: str,
         db = Depends(SupabaseConnectionService().connect),
