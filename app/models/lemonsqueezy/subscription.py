@@ -1,7 +1,8 @@
-from pydantic import BaseModel
-from pydantic import BaseModel, HttpUrl, Field
-from typing import Optional
+from pydantic import BaseModel, HttpUrl
+from typing import Optional, Literal
 from datetime import datetime
+
+from app.models.lemonsqueezy.base import BaseLemonsqueezyDataModel
 
 
 class FirstSubscriptionItem(BaseModel):
@@ -44,11 +45,10 @@ class SubscriptionAttributes(BaseModel):
     test_mode: Optional[bool] = None
 
 
-class SubscriptionData(BaseModel):
-    type: Optional[str] = None
-    id: str
+class Subscription(BaseLemonsqueezyDataModel):
+    type: Literal["subscriptions"]
     attributes: SubscriptionAttributes
 
 
 class SubscriptionResponse(BaseModel):
-    data: SubscriptionData
+    data: Subscription
