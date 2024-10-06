@@ -8,6 +8,7 @@ from postgrest import APIError
 from sentry_sdk import capture_exception
 from supabase import AsyncClient
 
+from app.repository.users_repository import UsersRepository
 from app.services.cache.base import BaseCacheService
 from app.services.usage.free_tier_usage.base import BaseFreeTierUsageService
 from app.settings import settings
@@ -32,15 +33,14 @@ class FreeTierUsageServiceWithCache(BaseFreeTierUsageService):
 
     async def _is_user_premium_db(self, user_id: str) -> Tuple[bool, datetime.datetime | None]:
         try:
-            resp = await self.db.table("subscription_payments").select(
-                "valid_until"
+            resp = await self.db.table("users").select(
+                "is_premium"
+                "premium_until"
             ).eq(
                 "user_id", user_id
-            ).gt(
-                "valid_until", datetime.datetime.now().isoformat()
-            ).limit(1).execute()
-            is_active = bool(resp.data)
-            valid_until = resp.data[0].get("valid_until") if is_active else None
+            ).single().execute()
+            is_active = resp.dat.get("is_premium", False)
+            valid_until = resp.dat.get("valid_until") if is_active else None
             valid_until = datetime.datetime.fromisoformat(valid_until) if valid_until else None
             return is_active, valid_until
         except APIError as e:
