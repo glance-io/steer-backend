@@ -20,6 +20,7 @@ class User(BaseModel):
     subscription_id: Optional[str] = None
     is_premium: bool = False
     tier: str
+    premium_until: Optional[datetime] = None
 
 
 class Usage(BaseModel):

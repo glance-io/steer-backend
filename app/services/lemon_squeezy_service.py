@@ -8,7 +8,7 @@ from postgrest.types import CountMethod
 from supabase import AsyncClient
 
 from app.models.lemonsqueezy.license import LicenseResponse
-from app.models.lemonsqueezy.subscription import SubscriptionResponse, SubscriptionAttributes, SubscriptionData
+from app.models.lemonsqueezy.subscription import SubscriptionResponse, SubscriptionAttributes, Subscription
 from app.settings import settings
 
 logger = structlog.getLogger(__name__)
@@ -55,7 +55,7 @@ class LemonSqueezyService:
             raise ValueError(ls_license.error)
         return ls_license
 
-    async def get_subscription_detail(self, subscription_id: int, client: httpx.AsyncClient) -> SubscriptionData:
+    async def get_subscription_detail(self, subscription_id: int, client: httpx.AsyncClient) -> Subscription:
         response = await client.get(
             f"{self.api_url}/subscriptions/{subscription_id}"
         )
@@ -63,7 +63,7 @@ class LemonSqueezyService:
         subscription_response = SubscriptionResponse(**response.json())
         return subscription_response.data
 
-    async def pair_existing_license_with_user(self, user_id: str, license_key: str, instance_id: str) -> Tuple[SubscriptionData | None, bool]:
+    async def pair_existing_license_with_user(self, user_id: str, license_key: str, instance_id: str) -> Tuple[Subscription | None, bool]:
         try:
             async with httpx.AsyncClient(
                     headers={"Authorization": f"Bearer {settings.lemonsqueezy_api_key}"}

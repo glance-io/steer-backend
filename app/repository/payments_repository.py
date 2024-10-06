@@ -21,7 +21,9 @@ class PaymentsRepository:
                     **kwargs
                 }, count=CountMethod.exact
             ).execute()
-            return response
+            if not response.count:
+                raise Exception("No rows affected by insert")
+            return response.data[0]
         except Exception as e:
             logger.error("Failed to create payment", error=str(e))
             capture_exception(e)

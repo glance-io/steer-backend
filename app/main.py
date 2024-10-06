@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import completion_router, usage_router, users_router
+from app.api import completion_router, usage_router, users_router, webhooks_router
 import sentry_sdk
 
 from app.services.cache.redis_cache import RedisCacheService
@@ -46,7 +46,7 @@ app.add_middleware(
 app.include_router(completion_router)
 app.include_router(usage_router)
 app.include_router(users_router)
-
+app.include_router(webhooks_router)
 
 
 if __name__ == "__main__":
