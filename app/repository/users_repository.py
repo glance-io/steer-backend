@@ -64,9 +64,10 @@ class UsersRepository:
             return user, True
 
     async def update_user(self, user_id: str, **kwargs) -> User:
+        data = {k: v.isoformat() if isinstance(v, datetime) else v for k, v in kwargs.items()}
         try:
             response = await self.repository.update(
-                kwargs, count=CountMethod.exact
+                data, count=CountMethod.exact
             ).eq(
                 "id", user_id
             ).execute()
@@ -100,6 +101,18 @@ class UsersRepository:
                 logger.warning("User does not exist", user_id=user_id)
                 raise UserDoesNotExistError
             logger.error("Failed to get user", error=str(e))
+
+    async def get_user_by_lemonsqueezy_id(self, lemonsqueezy_id: int) -> User | None:
+        try:
+            resp = await self.db.table("users").select("*").eq(
+                "lemonsqueezy_id",
+                lemonsqueezy_id
+            ).single().execute()
+
+            return User(**resp.data)
+        except APIError as e:
+            if e.code == "PGRST116":
+                return None
 
 
 if __name__ == '__main__':

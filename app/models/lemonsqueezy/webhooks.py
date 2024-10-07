@@ -1,7 +1,7 @@
 from enum import Enum
 from typing import Any, Dict, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.models.lemonsqueezy.license_key import LicenseKey
 from app.models.lemonsqueezy.order import Order
@@ -33,4 +33,4 @@ class WebhookMeta(BaseModel):
 
 class WebhookPayload(BaseModel):
     meta: WebhookMeta
-    data: Subscription | LicenseKey | Order
+    data: Subscription | LicenseKey | Order = Field(..., discriminator="type")
