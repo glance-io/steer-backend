@@ -1,3 +1,5 @@
+from datetime import datetime
+
 import structlog
 from postgrest.types import CountMethod
 from sentry_sdk import capture_exception
@@ -14,11 +16,12 @@ class PaymentsRepository:
         self.repository = self.db.table(self.table_name)
 
     async def create(self, user_id: str, **kwargs):
+        data = {k: v.isoformat() if isinstance(v, datetime) else v for k, v in kwargs.items()}
         try:
             response = await self.repository.insert(
                 {
                     "user_id": user_id,
-                    **kwargs
+                    **data
                 }, count=CountMethod.exact
             ).execute()
             if not response.count:
