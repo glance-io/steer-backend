@@ -25,7 +25,6 @@ async def sign_in(data: SignInDTO, db: AsyncClient = Depends(SupabaseConnectionS
 
     if created:
         ls_service = LemonSqueezyService(db=db)
-        payments_repo = PaymentsRepository(db=db)
         subscription_detail, is_premium = await ls_service.pair_existing_license_with_user(
             user_id=auth_user.id,
             license_key=data.license_key,
@@ -34,13 +33,9 @@ async def sign_in(data: SignInDTO, db: AsyncClient = Depends(SupabaseConnectionS
         user = await users_repo.update_user(
             auth_user.id,
             is_premium=is_premium,
+            premium_until=subscription_detail.valid_until,
             subscription_id=subscription_detail.subscription_id,
             lemonsqueezy_id=subscription_detail.customer_id
-        )
-        await payments_repo.create(
-            user_id=auth_user.id,
-            valid_from=subscription_detail.valid_from.isoformat(),
-            valid_until=subscription_detail.valid_until.isoformat(),
         )
 
     return {"is_premium": user.is_premium}

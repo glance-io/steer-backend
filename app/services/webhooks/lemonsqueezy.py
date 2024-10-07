@@ -10,6 +10,7 @@ from supabase import AsyncClient
 
 from app.models.lemonsqueezy.order import Order
 from app.models.lemonsqueezy.subscription import Subscription
+from app.models.lemonsqueezy.subscription_invoice import SubscriptionInvoice
 from app.models.lemonsqueezy.webhooks import WebhookPayload, EventType as WebhookEventType
 from app.repository.payments_repository import PaymentsRepository
 from app.repository.users_repository import UsersRepository
@@ -65,13 +66,19 @@ class LemonsqueezyWebhookService:
             raise ValueError("User not found by lemonsqueezy_id")
         return user.id
 
-    async def _handle_subscription_payment_success(self, data: Subscription, user_id: str | None):
+    async def _handle_subscription_payment_success(self, data: SubscriptionInvoice, user_id: str | None):
         if not user_id:
             user_id = await self._get_user_id_by_lemonsqueezy_id(data.attributes.customer_id)
         payment_record = await self._payments_repository.create(
+            created_at=data.attributes.created_at,
             user_id=user_id,
-            time_from=data.attributes.paid_at.isoformat(),
-            time_to=data.attributes.renews_at.isoformat(),
+            updated_at=data.attributes.updated_at,
+            total=data.attributes.total,
+            subtotal=data.attributes.subtotal,
+            billing_reason=data.attributes.billing_reason,
+            status=data.attributes.status,
+            currency=data.attributes.currency,
+            ls_subscription_id=data.attributes.subscription_id,
         )
         logger.info("Payment record created", payment_record=payment_record, user_id=user_id)
 
@@ -106,12 +113,18 @@ class LemonsqueezyWebhookService:
         logger.debug("Processing subscription event", event_type=event_type, data=data)
         if event_type == WebhookEventType.SUBSCRIPTION_CREATED:
             await self._handle_subscription_created(data, user_id)
-        elif event_type == WebhookEventType.SUBSCRIPTION_PAYMENT_SUCCESS:
-            await self._handle_subscription_payment_success(data, user_id)
         elif event_type == WebhookEventType.SUBSCRIPTION_UPDATED:
             await self._handle_subscription_updated(data, user_id)
         elif event_type == WebhookEventType.SUBSCRIPTION_CANCELLED:
             await self._handle_subscription_cancelled(data, user_id)
+
+    async def _process_subscription_invoice_event(self, event_type: WebhookEventType, data: SubscriptionInvoice, user_id: str | None):
+        logger.debug("Processing subscription invoice event", event_type=event_type, data=data)
+        if event_type == WebhookEventType.SUBSCRIPTION_PAYMENT_SUCCESS:
+            await self._handle_subscription_payment_success(data, user_id)
+        else:
+            logger.warning("Unknown event type for subscription invoice", event_type=event_type, data=data)
+            sentry_sdk.capture_message("Unknown event type for subscription invoice", extra={'event_type': event_type, 'data': data})
 
     async def _process_webhook_event(self, data: Dict[str, Any], signature: str):
         logger.debug("Processing webhook event", data=data, signature=signature)
@@ -122,6 +135,8 @@ class LemonsqueezyWebhookService:
             await self._process_order_event(data.meta.event_name, data.data, user_id)
         elif isinstance(data.data, Subscription):
             await self._process_subscription_event(data.meta.event_name, data.data, user_id)
+        elif isinstance(data.data, SubscriptionInvoice):
+            await self._process_subscription_invoice_event(data.meta.event_name, data.data, user_id)
         else:
             logger.warning("Unknown event type", data=data)
             sentry_sdk.capture_message("Unknown event type", extra={'data': data})

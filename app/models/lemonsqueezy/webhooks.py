@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 from app.models.lemonsqueezy.license_key import LicenseKey
 from app.models.lemonsqueezy.order import Order
 from app.models.lemonsqueezy.subscription import Subscription
+from app.models.lemonsqueezy.subscription_invoice import SubscriptionInvoice
 
 
 class EventType(str, Enum):
@@ -33,4 +34,4 @@ class WebhookMeta(BaseModel):
 
 class WebhookPayload(BaseModel):
     meta: WebhookMeta
-    data: Subscription | LicenseKey | Order = Field(..., discriminator="type")
+    data: Subscription | LicenseKey | SubscriptionInvoice | Order = Field(..., discriminator="type")
