@@ -34,12 +34,13 @@ async def sign_in(data: SignInDTO, db: AsyncClient = Depends(SupabaseConnectionS
         user = await users_repo.update_user(
             auth_user.id,
             is_premium=is_premium,
-            subscription_id=subscription_detail.subscription_id
+            subscription_id=subscription_detail.subscription_id,
+            lemonsqueezy_id=subscription_detail.customer_id
         )
         await payments_repo.create(
             user_id=auth_user.id,
-            valid_from=subscription_detail.valid_from,
-            valid_until=subscription_detail.valid_until
+            valid_from=subscription_detail.valid_from.isoformat(),
+            valid_until=subscription_detail.valid_until.isoformat(),
         )
 
     return {"is_premium": user.is_premium}

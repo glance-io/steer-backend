@@ -3,10 +3,9 @@ import json
 from pydantic import BaseModel
 
 from app.models.lemonsqueezy.base import BaseLemonsqueezyDataModel
-from typing import Optional, List
+from typing import Optional, List, Literal
 from enum import Enum
 from pydantic import BaseModel, Field
-
 
 
 class Status(str, Enum):
@@ -54,7 +53,7 @@ class OrderAttributes(BaseModel):
     total_usd: float
     refunded_amount_usd: Optional[float] = None
     tax_name: str
-    tax_rate: str
+    tax_rate: float
     tax_inclusive: bool
     status: Status
     status_formatted: str
@@ -77,4 +76,5 @@ class OrderAttributes(BaseModel):
 
 
 class Order(BaseLemonsqueezyDataModel):
+    type: Literal["orders"]
     attributes: OrderAttributes
