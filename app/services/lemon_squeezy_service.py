@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Tuple
+from typing import Tuple, Dict, Any
 
 import httpx
 import sentry_sdk
@@ -21,6 +21,7 @@ class LicenseNotActiveException(Exception):
 
 
 class LemonSqueezyService:
+    # TODO: Improve handling of requests so the public methods don't rely on the client being passed in
     api_url = "https://api.lemonsqueezy.com/v1"
     subscription_active_states = {'on_trial', 'active', 'paused', 'past_due'}
 

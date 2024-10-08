@@ -1,8 +1,10 @@
 import asyncio
+import datetime
 import json
 import uuid
 from typing import Any, Dict
 
+import httpx
 import sentry_sdk
 import structlog
 from postgrest.types import CountMethod
@@ -12,8 +14,11 @@ from app.models.lemonsqueezy.order import Order
 from app.models.lemonsqueezy.subscription import Subscription
 from app.models.lemonsqueezy.subscription_invoice import SubscriptionInvoice
 from app.models.lemonsqueezy.webhooks import WebhookPayload, EventType as WebhookEventType
+from app.models.tier import Tier
 from app.repository.payments_repository import PaymentsRepository
 from app.repository.users_repository import UsersRepository
+from app.services.lemon_squeezy_service import LemonSqueezyService as LemonsqueezyAPIService
+from app.settings import settings
 
 logger = structlog.getLogger(__name__)
 
@@ -31,6 +36,7 @@ class LemonsqueezyWebhookService:
         self.table = self.db.table("webhook_raw")
         self._users_repository = UsersRepository(db)
         self._payments_repository = PaymentsRepository(db)
+        self._ls_api_service = LemonsqueezyAPIService()
 
     def _validate_data(self, data: Dict[str, Any]):
         try:
@@ -41,7 +47,33 @@ class LemonsqueezyWebhookService:
             raise e
 
     async def _process_order_event(self, event_type: WebhookEventType, data: Order, user_id: str | None):
+        if not user_id:
+            user_id = await self._get_user_id_by_lemonsqueezy_id(data.attributes.customer_id)
         logger.debug("Processing order event", event_type=event_type, data=data)
+        if event_type == WebhookEventType.ORDER_CREATED:
+            if not data.attributes.first_order_item.product_id == settings.lemonsqueezy_product_id:
+                logger.warning("Order is not for our product", data=data)
+                sentry_sdk.capture_message("Order is not for our product", extra={'data': data})
+                return
+            variant, price = await self._ls_api_service.get_product_variant_detail(
+                data.attributes.first_order_item.product_variant_id,
+                httpx.AsyncClient(
+                    headers={"Authorization": f"Bearer {settings.lemonsqueezy_api_key}"}
+                )
+            )
+            if price.attributes.is_lifetime:
+                premium_until = datetime.datetime.max
+                await self._users_repository.update_user(
+                    user_id=user_id,
+                    is_premium=True,
+                    premium_until=premium_until,
+                    lemonsqueezy_id=data.attributes.customer_id,
+                    subscription_id=None,
+                    tier=Tier.LIFETIME,
+                )
+        else:
+            logger.warning("Unknown event type for order", event_type=event_type, data=data)
+            sentry_sdk.capture_message("Unknown event type for order", extra={'event_type': event_type, 'data': data})
 
     async def _handle_subscription_created(self, data: Subscription, user_id: str | None):
         if not user_id:
