@@ -6,6 +6,6 @@ from pydantic import BaseModel
 class BaseLemonsqueezyDataModel(BaseModel):
     type: str
     id: str
-    relationships: Optional[Dict[str, Any]] = None
+    relationships: Optional[Any] = None
     links: Optional[Dict[str, Any]] = None
     attributes: Any

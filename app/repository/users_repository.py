@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Tuple
 
 import structlog
-from openai import APIError
+from postgrest import APIError
 from postgrest.types import CountMethod
 from supabase import AsyncClient
 
@@ -32,11 +32,11 @@ class UsersRepository:
     async def get_user(self, user_id: str) -> User:
         try:
             response = await self.repository.select("*").eq("id", user_id).single().execute()
-            return User(**response.data, tier="premium" if response.data.is_premium else "free")
+            return User(**response.data, tier="premium" if response.data.get('is_premium') else "free")
         except APIError as e:
             if e.code == 'PGRST116':
                 logger.warning("User does not exist", user_id=user_id)
-                raise UserDoesNotExistError
+                raise UserDoesNotExistError()
             logger.error("Failed to get user", error=str(e))
 
     async def create_user(self, user_id: str, *args, **kwargs) -> User:
@@ -83,8 +83,10 @@ class UsersRepository:
         try:
             response = await self.repository.select(
                 "*",
-                "period_usage!inner(*)"
-            ).eq("id", user_id).gte("period_usage.time_to", datetime.now().isoformat()).limit(1).single().execute()
+                "period_usage(*)"
+            ).eq(
+                "id", user_id
+            ).gte("period_usage.time_to", datetime.now().isoformat()).limit(1).single().execute()
             if not response.data:
                 raise UserDoesNotExistError
             data = response.data
@@ -101,6 +103,9 @@ class UsersRepository:
                 logger.warning("User does not exist", user_id=user_id)
                 raise UserDoesNotExistError
             logger.error("Failed to get user", error=str(e))
+        except BaseException as e:
+            logger.error("Failed to get user", error=str(e))
+            raise e
 
     async def get_user_by_lemonsqueezy_id(self, lemonsqueezy_id: int) -> User | None:
         try:

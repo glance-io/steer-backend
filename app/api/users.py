@@ -1,10 +1,12 @@
+import datetime
+
 from fastapi import APIRouter, HTTPException, Depends
 from postgrest import APIError
 from supabase import AsyncClient
 
 from app.depends.auth import auth_dependency
+from app.models.tier import Tier
 from app.models.users import SignInDTO, UserWithUsage
-from app.repository.payments_repository import PaymentsRepository
 from app.repository.users_repository import UsersRepository, UserDoesNotExistError
 from app.services.db.supabase import SupabaseConnectionService
 from app.services.lemon_squeezy_service import LemonSqueezyService
@@ -23,19 +25,22 @@ async def sign_in(data: SignInDTO, db: AsyncClient = Depends(SupabaseConnectionS
         instance_id=data.instance_id
     )
 
-    if created:
-        ls_service = LemonSqueezyService(db=db)
-        subscription_detail, is_premium = await ls_service.pair_existing_license_with_user(
+    if created and data.license_key and data.instance_id:
+        ls_service = LemonSqueezyService()
+        subscription_detail, is_premium, is_lifetime = await ls_service.pair_existing_license_with_user(
             user_id=auth_user.id,
             license_key=data.license_key,
             instance_id=data.instance_id
         )
+        premium_until = subscription_detail.valid_until if subscription_detail else datetime.datetime.max if is_lifetime else None
         user = await users_repo.update_user(
             auth_user.id,
             is_premium=is_premium,
-            premium_until=subscription_detail.valid_until,
-            subscription_id=subscription_detail.subscription_id,
-            lemonsqueezy_id=subscription_detail.customer_id
+            premium_until=subscription_detail.valid_until if subscription_detail else None,
+            subscription_id=subscription_detail.subscription_id if subscription_detail else None,
+            lemonsqueezy_id=subscription_detail.customer_id if subscription_detail else None,
+            variant_id=subscription_detail.attributes.variant_id if subscription_detail else None,
+            tier=Tier.FREE if not is_premium else Tier.PREMIUM if not is_lifetime else Tier.LIFETIME
         )
 
     return {"is_premium": user.is_premium}

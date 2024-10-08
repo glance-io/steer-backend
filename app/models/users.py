@@ -8,8 +8,8 @@ from app.models.config import ThrottlingConfig
 
 
 class SignInDTO(BaseModel):
-    instance_id: str
-    license_key: str
+    instance_id: Optional[str] = None
+    license_key: Optional[str] = None
 
 
 class User(BaseModel):
