@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     llm_provider: LLMProvider = LLMProvider.OPENAI
     lemonsqueezy_api_key: str
     lemonsqueezy_webhook_secret: str = 'test123'   # TODO: change to real secret
+    lemonsqueezy_product_id: str
     sentry_dsn: str
     rephrase_temperature: float = 1
     fix_grammar_temperature: float = 1
