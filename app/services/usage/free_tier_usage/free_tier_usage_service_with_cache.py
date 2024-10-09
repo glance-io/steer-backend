@@ -33,13 +33,12 @@ class FreeTierUsageServiceWithCache(BaseFreeTierUsageService):
     async def _is_user_premium_db(self, user_id: str) -> Tuple[bool, datetime.datetime | None]:
         try:
             resp = await self.db.table("users").select(
-                "is_premium"
-                "premium_until"
+                "is_premium, premium_until"
             ).eq(
-                "user_id", user_id
+                "id", user_id
             ).single().execute()
-            is_active = resp.dat.get("is_premium", False)
-            valid_until = resp.dat.get("valid_until") if is_active else None
+            is_active = resp.data.get("is_premium", False)
+            valid_until = resp.data.get("valid_until") if is_active else None
             valid_until = datetime.datetime.fromisoformat(valid_until) if valid_until else None
             return is_active, valid_until
         except APIError as e:
@@ -73,9 +72,7 @@ class FreeTierUsageServiceWithCache(BaseFreeTierUsageService):
     async def _get_user_usage_db(self, user_id: str) -> Tuple[int, datetime.datetime | None]:
         try:
             resp = await self.db.table("period_usage").select(
-                "time_from",
-                "time_to",
-                "usage"
+                "time_from, time_to, usage"
             ).eq("user_id", user_id).order(
                 "time_to", desc=True
             ).limit(1).execute()
