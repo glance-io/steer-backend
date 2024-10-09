@@ -23,7 +23,7 @@ class LicenseNotActiveException(Exception):
 class LemonSqueezyService:
     # TODO: Improve handling of requests so the public methods don't rely on the client being passed in
     api_url = "https://api.lemonsqueezy.com/v1"
-    subscription_active_states = {'on_trial', 'active', 'paused', 'past_due'}
+    subscription_active_states = {'on_trial', 'active', 'paused', 'past_due', 'cancelled'}
 
     # noinspection DuplicatedCode
     async def __get_subscription_item_from_order_product(self, order_item_id: int, client: httpx.AsyncClient) -> int:
