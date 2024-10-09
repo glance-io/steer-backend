@@ -8,7 +8,6 @@ from postgrest import APIError
 from sentry_sdk import capture_exception
 from supabase import AsyncClient
 
-from app.repository.users_repository import UsersRepository
 from app.services.cache.base import BaseCacheService
 from app.services.usage.free_tier_usage.base import BaseFreeTierUsageService
 from app.settings import settings
@@ -135,3 +134,10 @@ class FreeTierUsageServiceWithCache(BaseFreeTierUsageService):
             logger.warning("Usage mismatch", user_id=user_id, usage=usage, usage_cache=usage_cache, usage_delta=usage_delta)
             sentry_sdk.capture_message(f"Usage mismatch for user {user_id}", level="warning")
         await self.cache.set(self._usage_key(user_id), usage, ttl=ttl)
+
+    async def revalidate_user(self, user_id):
+        await self.cache.delete(self._premium_key(user_id))
+        await self.cache.delete(self._usage_key(user_id))
+        await self.is_user_premium(user_id)
+        await self.get_user_usage(user_id)
+        return True

@@ -18,6 +18,9 @@ class ThrottlingPeriod(str, Enum):
         obj.days = days
         return obj
 
+    def __str__(self):
+        return self.value
+
 
 class ThrottlingConfig(BaseModel):
     limit: int

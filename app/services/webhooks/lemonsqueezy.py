@@ -17,7 +17,9 @@ from app.models.lemonsqueezy.webhooks import WebhookPayload, EventType as Webhoo
 from app.models.tier import Tier
 from app.repository.payments_repository import PaymentsRepository
 from app.repository.users_repository import UsersRepository
+from app.services.cache.redis_cache import RedisCacheService
 from app.services.lemon_squeezy_service import LemonSqueezyService as LemonsqueezyAPIService
+from app.services.usage.free_tier_usage.free_tier_usage_service_with_cache import FreeTierUsageServiceWithCache
 from app.settings import settings
 
 logger = structlog.getLogger(__name__)
@@ -37,6 +39,10 @@ class LemonsqueezyWebhookService:
         self._users_repository = UsersRepository(db)
         self._payments_repository = PaymentsRepository(db)
         self._ls_api_service = LemonsqueezyAPIService()
+        self._free_tier_usage_service = FreeTierUsageServiceWithCache(
+            cache=RedisCacheService(),
+            db=db,
+        )
 
     def _validate_data(self, data: Dict[str, Any]):
         try:
@@ -172,6 +178,10 @@ class LemonsqueezyWebhookService:
         else:
             logger.warning("Unknown event type", data=data)
             sentry_sdk.capture_message("Unknown event type", extra={'data': data})
+            return
+
+        uid = user_id if user_id else await self._get_user_id_by_lemonsqueezy_id(data.data.attributes.customer_id)
+        await self._free_tier_usage_service.revalidate_user(uid)
 
     async def process_webhook_event(self, data: Dict[str, Any], signature: str):
         logger.info("Received webhook event", data=data, signature=signature)
