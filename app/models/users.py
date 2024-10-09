@@ -17,9 +17,10 @@ class User(BaseModel):
     email: str
     license_key: Optional[str] = None
     instance_id: Optional[str] = None
-    subscription_id: Optional[str] = None
+    subscription_id: Optional[int] = None
     variant_id: Optional[int] = None
     is_premium: bool = False
+    lemonsqueezy_id: Optional[int] = None
     tier: str
     premium_until: Optional[datetime] = None
 
