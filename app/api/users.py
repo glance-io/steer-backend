@@ -32,16 +32,23 @@ async def sign_in(data: SignInDTO, db: AsyncClient = Depends(SupabaseConnectionS
             license_key=data.license_key,
             instance_id=data.instance_id
         )
-        premium_until = subscription_detail.valid_until if subscription_detail else datetime.datetime.max if is_lifetime else None
-        user = await users_repo.update_user(
-            auth_user.id,
-            is_premium=is_premium,
-            premium_until=subscription_detail.valid_until if subscription_detail else None,
-            subscription_id=subscription_detail.subscription_id if subscription_detail else None,
-            lemonsqueezy_id=subscription_detail.customer_id if subscription_detail else None,
-            variant_id=subscription_detail.attributes.variant_id if subscription_detail else None,
-            tier=Tier.FREE if not is_premium else Tier.PREMIUM if not is_lifetime else Tier.LIFETIME
-        )
+        if is_lifetime:
+            user = await users_repo.update_user(
+                auth_user.id,
+                is_premium=True,
+                premium_until=datetime.datetime.max,
+                tier=Tier.LIFETIME
+            )
+        elif is_premium and subscription_detail:
+            user = await users_repo.update_user(
+                auth_user.id,
+                is_premium=is_premium,
+                premium_until=subscription_detail.attributes.renews_at if subscription_detail else None,
+                subscription_id=subscription_detail.id if subscription_detail else None,
+                lemonsqueezy_id=subscription_detail.attributes.customer_id if subscription_detail else None,
+                variant_id=subscription_detail.attributes.variant_id if subscription_detail else None,
+                tier=Tier.FREE if not is_premium else Tier.PREMIUM if not is_lifetime else Tier.LIFETIME
+            )
 
     return {"is_premium": user.is_premium}
 
