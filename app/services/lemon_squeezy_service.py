@@ -1,3 +1,4 @@
+import asyncio
 from datetime import datetime
 from typing import Tuple, Dict, Any
 
@@ -7,9 +8,12 @@ import structlog
 from postgrest.types import CountMethod
 from supabase import AsyncClient
 
+from app.models.lemonsqueezy.customer import Customer, CustomerResponse
 from app.models.lemonsqueezy.license import LicenseResponse
+from app.models.lemonsqueezy.order import OrderMultiResponse, Status as OrderStatus, OrderItem
 from app.models.lemonsqueezy.price import Price, PriceResponse
-from app.models.lemonsqueezy.subscription import SubscriptionResponse, SubscriptionAttributes, Subscription
+from app.models.lemonsqueezy.subscription import SubscriptionResponse, SubscriptionAttributes, Subscription, \
+    SubscriptionMultiResponse
 from app.models.lemonsqueezy.variant import Variant, VariantResponse
 from app.settings import settings
 
@@ -77,6 +81,48 @@ class LemonSqueezyService:
         subscription_response = SubscriptionResponse(**response.json())
         return subscription_response.data
 
+    async def get_customer(self, customer_id: int, client: httpx.AsyncClient) -> Customer:
+        response = await client.get(
+            f"{self.api_url}/customers/{customer_id}"
+        )
+        response.raise_for_status()
+        return CustomerResponse(**response.json()).data
+
+    async def rebuild_premium_state(self, customer_id: int) -> Tuple[bool, Subscription | OrderItem | None]:
+        async with httpx.AsyncClient(
+                headers={"Authorization": f"Bearer {settings.lemonsqueezy_api_key}"},
+                timeout=30,
+        ) as client:
+            customer = await self.get_customer(customer_id, client)
+            orders_link = customer.relationships.orders.links.related
+            subscriptions_link = customer.relationships.subscriptions.links.related
+            responses = await asyncio.gather(
+                client.get(orders_link),
+                client.get(subscriptions_link)
+            )
+            for resp in responses:
+                resp.raise_for_status()
+            orders_resp, subscriptions_resp = (
+                OrderMultiResponse(**responses[0].json()),
+                SubscriptionMultiResponse(**responses[1].json())
+            )
+            orders = [
+                o for o in orders_resp.data
+                if o.attributes.first_order_item.product_id == settings.lemonsqueezy_product_id
+            ]
+            for order in orders:
+                product_detail = await self.get_product_variant_detail(order.attributes.first_order_item.variant_id, client)
+                if order.attributes.status == OrderStatus.PAID and product_detail[1].attributes.is_lifetime:
+                    return True, order.attributes.first_order_item
+            subscriptions = [
+                s for s in subscriptions_resp.data
+                if s.attributes.product_id == settings.lemonsqueezy_product_id
+                and s.attributes.status in self.subscription_active_states
+            ]
+            if subscriptions:
+                return False, subscriptions[0]
+            return False, None
+
     async def pair_existing_license_with_user(self, user_id: str, license_key: str, instance_id: str) -> Tuple[Subscription | None, bool, bool]:
         try:
             async with (httpx.AsyncClient(
@@ -94,7 +140,7 @@ class LemonSqueezyService:
                 subscription_item_id = await self.__get_subscription_item_from_order_product(
                     ls_license.meta.order_item_id, client
                 )
-                variant, price = await self.get_product_variant_detail(ls_license.meta.product_variant_id, client)
+                variant, price = await self.get_product_variant_detail(ls_license.meta.variant_id, client)
                 if price.attributes.is_subscription:
                     subscription_detail = await self.get_subscription_detail(subscription_item_id, client)
                 else:
@@ -108,3 +154,13 @@ class LemonSqueezyService:
             logger.error(f"HTTP status Error Lemon Squeezy: {e}")
             sentry_sdk.capture_exception(e)
             raise ValueError(f"Failed to validate license: {e}")
+
+
+if __name__ == '__main__':
+    async def amain():
+        service = LemonSqueezyService()
+        is_lifetime, data = await service.rebuild_premium_state(2567981)
+        print(is_lifetime)
+        print(data)
+
+    asyncio.run(amain())

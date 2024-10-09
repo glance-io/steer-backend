@@ -81,3 +81,8 @@ class OrderAttributes(BaseModel):
 class Order(BaseLemonsqueezyDataModel):
     type: Literal["orders"]
     attributes: OrderAttributes
+
+
+class OrderMultiResponse(BaseModel):
+    data: List[Order]
+

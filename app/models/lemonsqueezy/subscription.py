@@ -1,5 +1,5 @@
 from pydantic import BaseModel, HttpUrl
-from typing import Optional, Literal
+from typing import Optional, Literal, List
 from datetime import datetime
 
 from app.models.lemonsqueezy.base import BaseLemonsqueezyDataModel
@@ -52,3 +52,7 @@ class Subscription(BaseLemonsqueezyDataModel):
 
 class SubscriptionResponse(BaseModel):
     data: Subscription
+
+
+class SubscriptionMultiResponse(BaseModel):
+    data: List[Subscription]

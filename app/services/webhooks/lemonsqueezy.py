@@ -2,7 +2,7 @@ import asyncio
 import datetime
 import json
 import uuid
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 import httpx
 import sentry_sdk
@@ -15,9 +15,11 @@ from app.models.lemonsqueezy.subscription import Subscription
 from app.models.lemonsqueezy.subscription_invoice import SubscriptionInvoice
 from app.models.lemonsqueezy.webhooks import WebhookPayload, EventType as WebhookEventType
 from app.models.tier import Tier
+from app.models.users import User
 from app.repository.payments_repository import PaymentsRepository
 from app.repository.users_repository import UsersRepository
 from app.services.cache.redis_cache import RedisCacheService
+from app.services.db.supabase import SupabaseConnectionService
 from app.services.lemon_squeezy_service import LemonSqueezyService as LemonsqueezyAPIService
 from app.services.usage.free_tier_usage.free_tier_usage_service_with_cache import FreeTierUsageServiceWithCache
 from app.settings import settings
@@ -27,6 +29,12 @@ logger = structlog.getLogger(__name__)
 
 class RawWebhookStorageError(Exception):
     pass
+
+
+class DBInconsistencyError(Exception):
+    def __init__(self, uid: str, message: str = "Database inconsistency error"):
+        self.uid = uid
+        super().__init__(f"{message} for user {uid}")
 
 
 class LemonsqueezyWebhookService:
@@ -97,6 +105,7 @@ class LemonsqueezyWebhookService:
                 "User variant does not match refunded variant",
                 extra={'user_id': user_id, 'user_variant_id': user.variant_id, 'refunded_variant_id': data.attributes.first_order_item.variant_id}
             )
+            raise DBInconsistencyError(uid=user_id)
 
     async def _process_order_event(self, event_type: WebhookEventType, data: Order, user_id: str | None):
         if not user_id:
@@ -131,17 +140,24 @@ class LemonsqueezyWebhookService:
         )
         logger.info("User created subscription", user=user)
 
-    async def _get_user_id_by_lemonsqueezy_id(self, lemonsqueezy_id: int) -> uuid.UUID:
+    async def _get_user_id_by_lemonsqueezy_id(self, lemonsqueezy_id: int, only_id: Optional[bool] = True) -> uuid.UUID | User:
         user = await self._users_repository.get_user_by_lemonsqueezy_id(lemonsqueezy_id)
         if not user:
             logger.error("User not found by lemonsqueezy_id", lemonsqueezy_id=lemonsqueezy_id)
             sentry_sdk.capture_message("User not found by lemonsqueezy_id", extra={'lemonsqueezy_id': lemonsqueezy_id})
             raise ValueError("User not found by lemonsqueezy_id")
-        return user.id
+        if only_id:
+            return user.id
+        return user
 
     async def _handle_subscription_payment_success(self, data: SubscriptionInvoice, user_id: str | None):
+        user = await self._users_repository.get_user(user_id) if user_id else await self._get_user_id_by_lemonsqueezy_id(data.attributes.customer_id)
         if not user_id:
-            user_id = await self._get_user_id_by_lemonsqueezy_id(data.attributes.customer_id)
+            user_id = user.id
+
+        if not user.subscription_id == data.attributes.subscription_id:
+            raise DBInconsistencyError(message="User subscription_id does not match with the event data", uid=user_id)
+
         payment_record = await self._payments_repository.create(
             created_at=data.attributes.created_at,
             user_id=user_id,
@@ -158,6 +174,9 @@ class LemonsqueezyWebhookService:
     async def _handle_subscription_updated(self, data: Subscription, user_id: str | None):
         if not user_id:
             user_id = str(await self._get_user_id_by_lemonsqueezy_id(data.attributes.customer_id))
+        user = await self._users_repository.get_user(user_id)
+        if not (user.subscription_id and  user.subscription_id == data.id and user.variant_id and user.variant_id == data.attributes.variant_id):
+            raise DBInconsistencyError(message="User subscription_id or variant_id does not match with the event data", uid=user_id)
         if data.attributes.status in self.subscription_active_states:
             user = await self._users_repository.update_user(
                 user_id=user_id,
@@ -181,8 +200,11 @@ class LemonsqueezyWebhookService:
         logger.info("User updated subscription", user=user)
 
     async def _handle_subscription_cancelled(self, data: Subscription, user_id: str | None):
+        user = await self._users_repository.get_user(user_id) if user_id else await self._get_user_id_by_lemonsqueezy_id(data.attributes.customer_id)
         if not user_id:
-            user_id = str(await self._get_user_id_by_lemonsqueezy_id(data.attributes.customer_id))
+            user_id = user.id
+        if not user.subscription_id == data.id or not user.variant_id == data.attributes.variant_id:
+            raise DBInconsistencyError(message="User cancel subscription_id does not match with the event data", uid=user_id)
         user = await self._users_repository.update_user(
             user_id=user_id,
             premium_until=data.attributes.ends_at
@@ -204,35 +226,83 @@ class LemonsqueezyWebhookService:
 
     async def _process_subscription_invoice_event(self, event_type: WebhookEventType, data: SubscriptionInvoice, user_id: str | None):
         logger.debug("Processing subscription invoice event", event_type=event_type, data=data)
-        if not data.attributes.product_id == settings.lemonsqueezy_product_id:
-            logger.warning("Subscription invoice is not for our product", product_id=data.attributes.product_id, config_id=settings.lemonsqueezy_product_id)
-            sentry_sdk.capture_message("Subscription invoice is not for our product", extra={'data': data})
-            return
 
         if event_type == WebhookEventType.SUBSCRIPTION_PAYMENT_SUCCESS:
             await self._handle_subscription_payment_success(data, user_id)
         else:
             logger.warning("Unknown event type for subscription invoice", event_type=event_type, data=data)
             sentry_sdk.capture_message("Unknown event type for subscription invoice", extra={'event_type': event_type, 'data': data})
+            await self._rebuild_db_state(user_id)
+
+    async def _rebuild_db_state(self, user_id: str):
+        logger.debug("Rebuilding DB state", user_id=user_id)
+        try:
+            self._ls_api_service = LemonsqueezyAPIService()
+            customer_id = (await self._users_repository.get_user(user_id)).lemonsqueezy_id
+            if not customer_id:
+                logger.error("Customer ID not found for user", user_id=user_id)
+                sentry_sdk.capture_message("Customer ID not found for user", extra={'user_id': user_id})
+                return
+            is_lifetime, data = await self._ls_api_service.rebuild_premium_state(customer_id)
+            if is_lifetime:
+                user = await self._users_repository.update_user(
+                    user_id=user_id,
+                    is_premium=True,
+                    premium_until=datetime.datetime.max,
+                    lemonsqueezy_id=customer_id,
+                    subscription_id=None,
+                    tier=Tier.LIFETIME
+                )
+            elif data is not None:
+                user = await self._users_repository.update_user(
+                    user_id=user_id,
+                    is_premium=True,
+                    premium_until=data.attributes.renews_at,
+                    lemonsqueezy_id=customer_id,
+                    subscription_id=data.id,
+                    variant_id=data.attributes.variant_id,
+                    tier=Tier.PREMIUM
+                )
+            else:
+                user = await self._users_repository.update_user(
+                    user_id=user_id,
+                    is_premium=False,
+                    premium_until=None,
+                    lemonsqueezy_id=customer_id,
+                    subscription_id=None,
+                    variant_id=None,
+                    tier=Tier.FREE
+                )
+
+            logger.info("DB state rebuilt", user=user)
+        except Exception as e:
+            logger.error("Failed to rebuild DB state", error=repr(e))
+            sentry_sdk.capture_exception(e)
+            raise e
 
     async def _process_webhook_event(self, data: Dict[str, Any], signature: str):
-        logger.debug("Processing webhook event", data=data, signature=signature)
-        data = self._validate_data(data)
-        user_id = data.meta.custom_data.get('user_id') if data.meta.custom_data else None
+        try:
+            logger.debug("Processing webhook event", data=data, signature=signature)
+            data = self._validate_data(data)
+            user_id = data.meta.custom_data.get('user_id') if data.meta.custom_data else None
 
-        if isinstance(data.data, Order):
-            await self._process_order_event(data.meta.event_name, data.data, user_id)
-        elif isinstance(data.data, Subscription):
-            await self._process_subscription_event(data.meta.event_name, data.data, user_id)
-        elif isinstance(data.data, SubscriptionInvoice):
-            await self._process_subscription_invoice_event(data.meta.event_name, data.data, user_id)
-        else:
-            logger.warning("Unknown event type", data=data)
-            sentry_sdk.capture_message("Unknown event type", extra={'data': data})
-            return
+            if isinstance(data.data, Order):
+                await self._process_order_event(data.meta.event_name, data.data, user_id)
+            elif isinstance(data.data, Subscription):
+                await self._process_subscription_event(data.meta.event_name, data.data, user_id)
+            elif isinstance(data.data, SubscriptionInvoice):
+                await self._process_subscription_invoice_event(data.meta.event_name, data.data, user_id)
+            else:
+                logger.warning("Unknown event type", data=data)
+                sentry_sdk.capture_message("Unknown event type", extra={'data': data})
+                return
 
-        uid = user_id if user_id else await self._get_user_id_by_lemonsqueezy_id(data.data.attributes.customer_id)
-        await self._free_tier_usage_service.revalidate_user(uid)
+            uid = user_id if user_id else await self._get_user_id_by_lemonsqueezy_id(data.data.attributes.customer_id)
+            await self._free_tier_usage_service.revalidate_user(uid)
+        except DBInconsistencyError as e:
+            logger.error("DB inconsistency error", error=str(e))
+            sentry_sdk.capture_exception(e, extra={'data': data})
+            await self._rebuild_db_state(e.uid)
 
     async def process_webhook_event(self, data: Dict[str, Any], signature: str):
         logger.info("Received webhook event", data=data, signature=signature)
@@ -253,3 +323,12 @@ class LemonsqueezyWebhookService:
             signature=signature,
             db_id=resp.data[0].get('id')
         )
+
+
+if __name__ == '__main__':
+    async def amain():
+        service = LemonsqueezyWebhookService(
+            db=await SupabaseConnectionService().connect()
+        )
+        await service._rebuild_db_state("0822cebf-4a35-4161-9f1f-c45fafb36c15")
+    asyncio.run(amain())
