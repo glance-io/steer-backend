@@ -6,7 +6,7 @@ from postgrest import APIError
 from postgrest.types import CountMethod
 from supabase import AsyncClient
 
-from app.models.users import User, UserWithUsage
+from app.models.users import User, UserWithUsage, Usage
 from app.services.db.supabase import SupabaseConnectionService
 from app.settings import settings
 
@@ -79,23 +79,20 @@ class UsersRepository:
             logger.error("Failed to update user", error=str(e))
             raise e
 
+    async def _get_usage_from_db(self, user_id: str) -> Usage | None:
+        response = await self.db.table("period_usage").select("*").gt(
+            "time_to", datetime.now().isoformat()
+        ).limit(1).execute()
+        if not response.data:
+            return None
+        return Usage(**response.data[0])
+
     async def get_user_with_usage(self, user_id: str):
         try:
-            response = await self.repository.select(
-                "*",
-                "period_usage(*)"
-            ).eq(
-                "id", user_id
-            ).gte("period_usage.time_to", datetime.now().isoformat()).limit(1).single().execute()
-            if not response.data:
-                raise UserDoesNotExistError
-            data = response.data
-            usage = data.pop("period_usage", None)
-            if isinstance(usage, list) and usage:
-                data["period_usage"] = usage[0]
+            user, usage = await asyncio.gather(self.get_user(user_id), self._get_usage_from_db(user_id))
             return UserWithUsage(
-                **data,
-                tier="premium" if data.get('is_premium') else "free",
+                **user.dict(),
+                period_usage=usage.usage if usage else None,
                 throttling_meta=settings.throttling_config
             )
         except APIError as e:
