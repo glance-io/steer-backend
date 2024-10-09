@@ -68,6 +68,7 @@ class LemonsqueezyWebhookService:
                 )
             )
             if price.attributes.is_lifetime:
+                logger.debug("User purchased lifetime subscription", user_id=user_id)
                 premium_until = datetime.datetime.max
                 await self._users_repository.update_user(
                     user_id=user_id,
@@ -77,6 +78,8 @@ class LemonsqueezyWebhookService:
                     subscription_id=None,
                     tier=Tier.LIFETIME,
                 )
+            else:
+                logger.debug("Non-lifetime subscription purchased", user_id=user_id)
         else:
             logger.warning("Unknown event type for order", event_type=event_type, data=data)
             sentry_sdk.capture_message("Unknown event type for order", extra={'event_type': event_type, 'data': data})
@@ -92,7 +95,7 @@ class LemonsqueezyWebhookService:
             premium_until=data.attributes.renews_at.isoformat(),
             lemonsqueezy_id=data.attributes.customer_id,
             subscription_id=data.id,
-            # TODO: tier
+            tier=Tier.PREMIUM
         )
         logger.info("User created subscription", user=user)
 
