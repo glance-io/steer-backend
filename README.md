@@ -1,7 +1,7 @@
 ![Logo Banner](logo_banner.png)
 # Steer
 
-Lightweight backend service for [grammar assistant app](https://steerapp.ai/).
+Lightweight backend service for a [grammar assistant app](https://steerapp.ai/).
 Can serve as an inspiration for LLM token streaming with OpenAI SDK and FastAPI.
 
 ## Getting Started
