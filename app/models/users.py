@@ -18,6 +18,7 @@ class User(BaseModel):
     license_key: Optional[str] = None
     instance_id: Optional[str] = None
     subscription_id: Optional[str] = None
+    variant_id: Optional[int] = None
     is_premium: bool = False
     tier: str
     premium_until: Optional[datetime] = None

@@ -9,9 +9,12 @@ from pydantic import BaseModel, Field
 
 
 class Status(str, Enum):
-    PAID = "paid"
     PENDING = "pending"
     FAILED = "failed"
+    PAID = "paid"
+    REFUNDED = "refunded"
+    PARTIAL_REFUND = "partial_refund"
+    FRAUDULENT = "fraudulent"
 
 
 class OrderItem(BaseModel):

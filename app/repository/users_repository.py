@@ -32,7 +32,7 @@ class UsersRepository:
     async def get_user(self, user_id: str) -> User:
         try:
             response = await self.repository.select("*").eq("id", user_id).single().execute()
-            return User(**response.data, tier="premium" if response.data.get('is_premium') else "free")
+            return User(**response.data)
         except APIError as e:
             if e.code == 'PGRST116':
                 logger.warning("User does not exist", user_id=user_id)
@@ -50,7 +50,7 @@ class UsersRepository:
             if not response.count == 1:
                 raise FailedToCreateUserError
             data = response.data[0]
-            return User(**data, tier="premium" if data.get('is_premium') else "free")
+            return User(**data)
         except APIError as e:
             logger.error("Failed to create user", error=str(e))
             raise e
@@ -74,7 +74,7 @@ class UsersRepository:
             if not response.count == 1:
                 raise FailedToCreateUserError
             data = response.data[0]
-            return User(**data, tier="premium" if data.get('is_premium') else "free")
+            return User(**data)
         except APIError as e:
             logger.error("Failed to update user", error=str(e))
             raise e
