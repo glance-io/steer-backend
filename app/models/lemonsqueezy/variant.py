@@ -3,17 +3,12 @@ from typing import Literal, Optional, List
 
 from pydantic import BaseModel, Field
 
-from app.models.lemonsqueezy.base import BaseLemonsqueezyDataModel
+from app.models.lemonsqueezy.base import BaseLemonsqueezyDataModel, RelationshipEntity
 
 
 class Link(BaseModel):
     title: str
     url: str
-
-
-class RelationshipLink(BaseModel):
-    related: str
-    self: str
 
 
 class VariantAttributes(BaseModel):
@@ -34,10 +29,6 @@ class VariantAttributes(BaseModel):
     updated_at: datetime
     test_mode: bool
     links: Optional[List[Link]] = None
-
-
-class RelationshipEntity(BaseModel):
-    links: RelationshipLink
 
 
 class VariantRelationships(BaseModel):
