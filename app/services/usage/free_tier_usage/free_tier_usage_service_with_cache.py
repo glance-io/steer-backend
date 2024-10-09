@@ -111,6 +111,7 @@ class FreeTierUsageServiceWithCache(BaseFreeTierUsageService):
             "p_uid": user_id,
             "p_date": datetime.datetime.now().isoformat(),
             "p_delta": usage_delta,
+            "p_interval_days": settings.throttling_config.period.days,
         }).execute()
         if not resp.data:
             raise ValueError("Failed to update user usage")
