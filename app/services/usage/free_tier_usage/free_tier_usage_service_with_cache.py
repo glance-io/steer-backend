@@ -38,7 +38,7 @@ class FreeTierUsageServiceWithCache(BaseFreeTierUsageService):
                 "id", user_id
             ).single().execute()
             is_active = resp.data.get("is_premium", False)
-            valid_until = resp.data.get("valid_until") if is_active else None
+            valid_until = resp.data.get("premium_until") if is_active else None
             valid_until = datetime.datetime.fromisoformat(valid_until) if valid_until else None
             return is_active, valid_until
         except APIError as e:
@@ -54,9 +54,9 @@ class FreeTierUsageServiceWithCache(BaseFreeTierUsageService):
         is_premium = await self.cache.get(self._premium_key(user_id))
         if is_premium is None:
             is_premium, valid_until = await self._is_user_premium_db(user_id)
-            if is_premium and valid_until and valid_until > datetime.datetime.now():
-                ttl = int((valid_until - datetime.datetime.now()).total_seconds())
-                await self.cache.set(self._premium_key(user_id), bytes(is_premium), ttl=ttl)
+            valid_ttl = (valid_until - datetime.datetime.now(tz=datetime.timezone.utc)).total_seconds() if valid_until else None
+            if is_premium and valid_ttl:
+                await self.cache.set(self._premium_key(user_id), bytes(is_premium), ttl=int(valid_ttl))
             else:
                 is_premium = False
                 await self.cache.set(self._premium_key(user_id), bytes(is_premium), ttl=60*60)   # Effectively is premium is False, cache for 1 hour. Webhook will update it
@@ -82,9 +82,10 @@ class FreeTierUsageServiceWithCache(BaseFreeTierUsageService):
             data = resp.data[0]
 
             time_to = datetime.datetime.fromisoformat(data["time_to"])
+            time_from = datetime.datetime.fromisoformat(data["time_from"])
 
-            if time_to < datetime.datetime.now() >= data["time_from"]:
-                return data["usage"]
+            if time_from <=  datetime.datetime.now() < time_to :
+                return data["usage"], time_to
             return 0, None
         except APIError as e:
             if e.code == "PGRST116":
@@ -128,6 +129,7 @@ class FreeTierUsageServiceWithCache(BaseFreeTierUsageService):
         usage, time_to = await self._update_user_usage_db(user_id, usage_delta)
         logger.debug("Updated user usage in db", user_id=user_id, usage=usage, time_to=time_to)
         ttl = int((time_to - datetime.datetime.now()).total_seconds())
+        # TODO: fix db inconsistency for is_premium too
         if usage != usage_cache + usage_delta:
             logger.warning("Usage mismatch", user_id=user_id, usage=usage, usage_cache=usage_cache, usage_delta=usage_delta)
             sentry_sdk.capture_message(f"Usage mismatch for user {user_id}", level="warning")
