@@ -1,4 +1,5 @@
 from datetime import datetime
+import asyncio
 from typing import Tuple
 
 import structlog
@@ -92,7 +93,7 @@ class UsersRepository:
             user, usage = await asyncio.gather(self.get_user(user_id), self._get_usage_from_db(user_id))
             return UserWithUsage(
                 **user.dict(),
-                period_usage=usage.usage if usage else None,
+                period_usage=usage,
                 throttling_meta=settings.throttling_config
             )
         except APIError as e:
