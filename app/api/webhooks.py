@@ -24,6 +24,8 @@ async def lemonsqueezy_webhook(
     try:
         # validate secret
         signature = req.headers.get("X-Signature")
+        if not signature:
+            raise HTTPException(status_code=403, detail="Missing signature header")
         validation_signature = hmac.new(settings.lemonsqueezy_webhook_secret.encode(), await req.body(), "sha256").hexdigest()
         if not hmac.compare_digest(signature, validation_signature):
             loggger.error("Invalid signature", signature=signature, validation_signature=validation_signature)
