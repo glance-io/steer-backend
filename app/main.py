@@ -44,7 +44,6 @@ app.add_middleware(
 )
 
 app.include_router(completion_router)
-app.include_router(usage_router)
 app.include_router(users_router)
 app.include_router(webhooks_router)
 
