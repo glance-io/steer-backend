@@ -2,17 +2,18 @@ from typing import Any, Optional
 
 import redis.asyncio as redis
 from app.services.cache.base import BaseCacheService
+from app.settings import settings
 from app.utils.singleton import Singleton
 
 
 class RedisCacheService(BaseCacheService):
     _instance = None
 
-    def __init__(self, host: str = "localhost", port: int = 6379, *args, **kwargs):
+    def __init__(self, host: Optional[str] = None, port: Optional[int] = None , *args, **kwargs):
         super().__init__(*args, **kwargs)
         if not hasattr(self, "_initialized"):
-            self.host = host
-            self.port = port
+            self.host = host or settings.redis_host
+            self.port = port or settings.redis_port
             self.redis: redis.Redis | None = None
 
     async def connect(self):
