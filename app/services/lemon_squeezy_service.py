@@ -1,5 +1,5 @@
 import asyncio
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Tuple, Dict, Any
 
 import httpx
@@ -8,6 +8,7 @@ import structlog
 from postgrest.types import CountMethod
 from supabase import AsyncClient
 
+from app.models.lemonsqueezy.checkout import CheckoutResponse, Checkout
 from app.models.lemonsqueezy.customer import Customer, CustomerResponse
 from app.models.lemonsqueezy.license import LicenseResponse
 from app.models.lemonsqueezy.order import OrderMultiResponse, Status as OrderStatus, OrderItem
@@ -155,12 +156,45 @@ class LemonSqueezyService:
             sentry_sdk.capture_exception(e)
             raise ValueError(f"Failed to validate license: {e}")
 
-
-if __name__ == '__main__':
-    async def amain():
-        service = LemonSqueezyService()
-        is_lifetime, data = await service.rebuild_premium_state(2567981)
-        print(is_lifetime)
-        print(data)
-
-    asyncio.run(amain())
+    async def create_checkout(self, user_id: str, email: str) -> Checkout:
+        # only implements the minimum required fields
+        async with httpx.AsyncClient(
+                headers={"Authorization": f"Bearer {settings.lemonsqueezy_api_key}"}
+        ) as client:
+            try:
+                response = await client.post(
+                    f"{self.api_url}/checkouts",
+                    json={
+                        "data": {
+                            "type": "checkouts",
+                            "attributes": {
+                                "store_id": settings.lemonsqueezy_store_id,
+                                "checkout_data": {
+                                    "email": email,
+                                    "custom": {
+                                        "user_id": user_id
+                                    }
+                                },
+                            },
+                            "relationships": {
+                                "store": {
+                                    "data": {
+                                        "type": "stores",
+                                        "id": settings.lemonsqueezy_store_id
+                                    }
+                                },
+                                "variant": {
+                                    "data": {
+                                        "type": "variants",
+                                        "id": settings.lemonsqueezy_default_variant_id
+                                    }
+                                }
+                            }
+                        }
+                    }
+                )
+                response.raise_for_status()
+                return CheckoutResponse(**response.json()).data
+            except httpx.HTTPStatusError as e:
+                logger.error(f"HTTP status Error Lemon Squeezy: {e}", content=e.response.content)
+                raise e

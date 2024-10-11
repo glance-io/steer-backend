@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     lemonsqueezy_api_key: str
     lemonsqueezy_webhook_secret: str = 'test123'   # TODO: change to real secret
     lemonsqueezy_product_id: int
+    lemonsqueezy_store_id: str
+    lemonsqueezy_default_variant_id: str
     redis_host: str = "localhost"
     redis_port: int = 6379
     sentry_dsn: str
@@ -27,7 +29,6 @@ class Settings(BaseSettings):
     prompts: PromptsConfig
     db_config: DBConfig
     throttling_config: ThrottlingConfig
-
 
     model_config = SettingsConfigDict(
         env_file=get_project_root() / ".env",
