@@ -72,6 +72,6 @@ async def get_profile(
 
 
 @router.get("/checkout")
-async def get_checkout_link(auth_user: AuthUser = Depends(auth_dependency), ls_api_service=Depends(LemonSqueezyService)):
-    checkout = await ls_api_service.create_checkout(auth_user.id, auth_user.email)
+async def get_checkout_link(uid: str, email: str, ls_api_service=Depends(LemonSqueezyService)):
+    checkout = await ls_api_service.create_checkout(uid, email)
     return RedirectResponse(url=checkout.attributes.url)
