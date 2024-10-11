@@ -83,7 +83,12 @@ class UsersRepository:
     async def _get_usage_from_db(self, user_id: str) -> Usage | None:
         response = await self.db.table("period_usage").select("*").gt(
             "time_to", datetime.now().isoformat()
+        ).eq(
+            "user_id", user_id
+        ).order(
+            "time_to", desc=True
         ).limit(1).execute()
+
         if not response.data:
             return None
         return Usage(**response.data[0])
