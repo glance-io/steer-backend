@@ -97,8 +97,9 @@ class RewriteService:
 
         logger.info("Rewrite completed", rewrite=rewrite, original_text=self.rewrite_request.text)
         conversation_messages.append(AssistantMessage(content=rewrite))
-        # noinspection PyAsyncCall
-        asyncio.create_task(self.usage_service.update_user_usage(
-            user_id=self.rewrite_request.uid,
-            usage_delta=1
-        ))
+        if self.usage_service is not None:
+            # noinspection PyAsyncCall
+            asyncio.create_task(self.usage_service.update_user_usage(
+                user_id=self.rewrite_request.uid,
+                usage_delta=1
+            ))
