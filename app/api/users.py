@@ -2,6 +2,7 @@ import datetime
 
 from fastapi import APIRouter, HTTPException, Depends
 from postgrest import APIError
+from starlette.responses import RedirectResponse
 from supabase import AsyncClient
 
 from app.depends.auth import auth_dependency
@@ -68,3 +69,9 @@ async def get_profile(
         raise HTTPException(status_code=500, detail="DB error")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/checkout")
+async def get_checkout_link(auth_user: AuthUser = Depends(auth_dependency), ls_api_service=Depends(LemonSqueezyService)):
+    checkout = await ls_api_service.create_checkout(auth_user.id, auth_user.email)
+    return RedirectResponse(url=checkout.attributes.url)
