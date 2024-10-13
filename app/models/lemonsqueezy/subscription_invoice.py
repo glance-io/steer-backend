@@ -28,8 +28,8 @@ class SubscriptionInvoiceAttributes(BaseModel):
     user_name: str
     user_email: str
     billing_reason: str
-    card_brand: str
-    card_last_four: str
+    card_brand: Optional[str] = None
+    card_last_four: Optional[str] = None
     currency: str
     currency_rate: float
     status: InvoiceStatus
