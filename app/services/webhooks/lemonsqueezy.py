@@ -101,10 +101,12 @@ class LemonsqueezyWebhookService:
                 user_variant_id=user.variant_id,
                 refunded_variant_id=data.attributes.first_order_item.variant_id
             )
-            sentry_sdk.capture_message(
-                "User variant does not match refunded variant",
-                extra={'user_id': user_id, 'user_variant_id': user.variant_id, 'refunded_variant_id': data.attributes.first_order_item.variant_id}
-            )
+            sentry_sdk.set_context({
+                'user_id': user_id,
+                'user_variant_id': user.variant_id,
+                'refunded_variant_id': data.attributes.first_order_item.variant_id
+            })
+            sentry_sdk.capture_message("User variant does not match refunded variant")
             raise DBInconsistencyError(uid=user_id)
 
     async def _process_order_event(self, event_type: WebhookEventType, data: Order, user_id: str | None):
@@ -114,7 +116,8 @@ class LemonsqueezyWebhookService:
         if not data.attributes.first_order_item.product_id == settings.lemonsqueezy_product_id:
             logger.warning("Order is not for our product", product_id=data.attributes.first_order_item.product_id,
                            config_id=settings.lemonsqueezy_product_id)
-            sentry_sdk.capture_message("Order is not for our product", extra={'data': data})
+            sentry_sdk.set_context({'data': data})
+            sentry_sdk.capture_message("Order is not for our product")
             return
         if event_type == WebhookEventType.ORDER_CREATED:
             await self._handle_order_created(data, user_id)
@@ -122,12 +125,14 @@ class LemonsqueezyWebhookService:
             await self._handle_order_refunded(data, user_id)
         else:
             logger.warning("Unknown event type for order", event_type=event_type, data=data)
-            sentry_sdk.capture_message("Unknown event type for order", extra={'event_type': event_type, 'data': data})
+            sentry_sdk.set_context({'event_type': event_type, 'data': data})
+            sentry_sdk.capture_message("Unknown event type for order")
 
     async def _handle_subscription_created(self, data: Subscription, user_id: str | None):
         if not user_id:
             logger.error("User ID not found in custom data", data=data)
-            sentry_sdk.capture_message("User ID not found in custom data", extra={'data': data})
+            sentry_sdk.set_context({'data': data})
+            sentry_sdk.capture_message("User ID not found in custom data")
             raise ValueError("User ID not found in custom data")
         user = await self._users_repository.update_user(
             user_id=user_id,
@@ -144,7 +149,8 @@ class LemonsqueezyWebhookService:
         user = await self._users_repository.get_user_by_lemonsqueezy_id(lemonsqueezy_id)
         if not user:
             logger.error("User not found by lemonsqueezy_id", lemonsqueezy_id=lemonsqueezy_id)
-            sentry_sdk.capture_message("User not found by lemonsqueezy_id", extra={'lemonsqueezy_id': lemonsqueezy_id})
+            sentry_sdk.set_context({'lemonsqueezy_id': lemonsqueezy_id})
+            sentry_sdk.capture_message("User not found by lemonsqueezy_id")
             raise ValueError("User not found by lemonsqueezy_id")
         if only_id:
             return user.id
@@ -215,7 +221,8 @@ class LemonsqueezyWebhookService:
         logger.debug("Processing subscription event", event_type=event_type, data=data)
         if not data.attributes.product_id == settings.lemonsqueezy_product_id:
             logger.warning("Subscription is not for our product", product_id=data.attributes.product_id, config_id=settings.lemonsqueezy_product_id)
-            sentry_sdk.capture_message("Subscription is not for our product", extra={'data': data})
+            sentry_sdk.set_context({'data': data})
+            sentry_sdk.capture_message("Subscription is not for our product")
             return
         if event_type == WebhookEventType.SUBSCRIPTION_CREATED:
             await self._handle_subscription_created(data, user_id)
@@ -231,7 +238,8 @@ class LemonsqueezyWebhookService:
             await self._handle_subscription_payment_success(data, user_id)
         else:
             logger.warning("Unknown event type for subscription invoice", event_type=event_type, data=data)
-            sentry_sdk.capture_message("Unknown event type for subscription invoice", extra={'event_type': event_type, 'data': data})
+            sentry_sdk.set_context({'event_type': event_type, 'data': data})
+            sentry_sdk.capture_message("Unknown event type for subscription invoice")
             await self._rebuild_db_state(user_id)
 
     async def _rebuild_db_state(self, user_id: str):
@@ -241,7 +249,8 @@ class LemonsqueezyWebhookService:
             customer_id = (await self._users_repository.get_user(user_id)).lemonsqueezy_id
             if not customer_id:
                 logger.error("Customer ID not found for user", user_id=user_id)
-                sentry_sdk.capture_message("Customer ID not found for user", extra={'user_id': user_id})
+                sentry_sdk.set_context({'user_id': user_id})
+                sentry_sdk.capture_message("Customer ID not found for user")
                 return
             is_lifetime, data = await self._ls_api_service.rebuild_premium_state(customer_id)
             if is_lifetime:
@@ -294,7 +303,8 @@ class LemonsqueezyWebhookService:
                 await self._process_subscription_invoice_event(data.meta.event_name, data.data, user_id)
             else:
                 logger.warning("Unknown event type", data=data)
-                sentry_sdk.capture_message("Unknown event type", extra={'data': data})
+                sentry_sdk.set_context({'data': data})
+                sentry_sdk.capture_message("Unknown event type")
                 return
 
             uid = user_id if user_id else await self._get_user_id_by_lemonsqueezy_id(data.data.attributes.customer_id)
@@ -313,7 +323,8 @@ class LemonsqueezyWebhookService:
         }, count=CountMethod.exact).execute()
         if not resp.count or not resp.data:
             logger.error("Failed to save webhook event", data=data)
-            sentry_sdk.capture_message("Failed to save webhook event", extra={'data': data})
+            sentry_sdk.set_context({'data': data})
+            sentry_sdk.capture_message("Failed to save webhook event")
             raise RawWebhookStorageError("Failed to insert webhook event")
         # then we create background task to process the event asynchronously and webhook could respond immediately
         task = asyncio.create_task(self._process_webhook_event(data, signature))
