@@ -1,6 +1,7 @@
 import asyncio
 from typing import Optional, AsyncGenerator
 
+import sentry_sdk
 import structlog
 from app.models.completion import RephraseTaskType, RephraseRequest
 from app.models.message import SystemMessage, UserMessage, AssistantMessage
@@ -69,9 +70,14 @@ class RewriteService:
             UserMessage(content=self.rewrite_request.text)
         ]
         if self.usage_service:
-            is_user_allowed = await self.usage_service.is_user_allowed(
-                user_id=self.rewrite_request.uid,
-            )
+            try:
+                is_user_allowed = await self.usage_service.is_user_allowed(
+                    user_id=self.rewrite_request.uid,
+                )
+            except Exception as e:
+                logger.error("Failed to check user allowance", error=str(e))
+                sentry_sdk.capture_exception(e)
+                is_user_allowed = True
         else:
             is_user_allowed = True
 
