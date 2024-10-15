@@ -206,7 +206,9 @@ class LemonsqueezyWebhookService:
         logger.info("User updated subscription", user=user)
 
     async def _handle_subscription_cancelled(self, data: Subscription, user_id: str | None):
-        user = await self._users_repository.get_user(user_id) if user_id else await self._get_user_id_by_lemonsqueezy_id(data.attributes.customer_id)
+        user = await self._users_repository.get_user(user_id) \
+            if user_id \
+            else await self._get_user_id_by_lemonsqueezy_id(data.attributes.customer_id, only_id=False)
         if not user_id:
             user_id = user.id
         if not user.subscription_id == data.id or not user.variant_id == data.attributes.variant_id:
