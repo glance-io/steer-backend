@@ -1,5 +1,7 @@
 import datetime
 
+import sentry_sdk
+import structlog
 from fastapi import APIRouter, HTTPException, Depends
 from postgrest import APIError
 from starlette.responses import RedirectResponse
@@ -28,11 +30,16 @@ async def sign_in(data: SignInDTO, db: AsyncClient = Depends(SupabaseConnectionS
 
     if created and data.license_key and data.instance_id:
         ls_service = LemonSqueezyService()
-        subscription_detail, is_premium, is_lifetime = await ls_service.pair_existing_license_with_user(
-            user_id=auth_user.id,
-            license_key=data.license_key,
-            instance_id=data.instance_id
-        )
+        try:
+            subscription_detail, is_premium, is_lifetime = await ls_service.pair_existing_license_with_user(
+                user_id=auth_user.id,
+                license_key=data.license_key,
+                instance_id=data.instance_id
+            )
+        except Exception as e:
+            sentry_sdk.capture_exception(e)
+            subscription_detail, is_premium, is_lifetime = None, False, False
+
         if is_lifetime:
             user = await users_repo.update_user(
                 auth_user.id,
