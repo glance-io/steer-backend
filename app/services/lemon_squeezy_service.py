@@ -5,11 +5,8 @@ from typing import Tuple, Dict, Any
 import httpx
 import sentry_sdk
 import structlog
-from postgrest.types import CountMethod
-from supabase import AsyncClient
-
 from app.models.lemonsqueezy.checkout import CheckoutResponse, Checkout
-from app.models.lemonsqueezy.customer import Customer, CustomerResponse
+from app.models.lemonsqueezy.customer import Customer, CustomerResponse, CustomerListResponse
 from app.models.lemonsqueezy.license import LicenseResponse
 from app.models.lemonsqueezy.order import OrderMultiResponse, Status as OrderStatus, OrderItem
 from app.models.lemonsqueezy.price import Price, PriceResponse
@@ -29,6 +26,12 @@ class LemonSqueezyService:
     # TODO: Improve handling of requests so the public methods don't rely on the client being passed in
     api_url = "https://api.lemonsqueezy.com/v1"
     subscription_active_states = {'on_trial', 'active', 'paused', 'past_due', 'cancelled'}
+
+    def get_http_client(self):
+        return httpx.AsyncClient(
+            headers={"Authorization": f"Bearer {settings.lemonsqueezy_api_key}"},
+            timeout=30,
+        )
 
     # noinspection DuplicatedCode
     async def __get_subscription_item_from_order_product(self, order_item_id: int, client: httpx.AsyncClient) -> int:
@@ -88,6 +91,19 @@ class LemonSqueezyService:
         )
         response.raise_for_status()
         return CustomerResponse(**response.json()).data
+
+    async def get_customer_by_email(self, email: str, client: httpx.AsyncClient) -> Customer | None:
+        response = await client.get(
+            f"{self.api_url}/customers",
+            params={"filter[email]": email}
+        )
+        response.raise_for_status()
+        customers = CustomerListResponse(**response.json()).data
+        if not customers:
+            return None
+        if len(customers) != 1:
+            logger.warning("Multiple customers found with the same email", email=email)
+        return customers[0]
 
     async def rebuild_premium_state(self, customer_id: int) -> Tuple[bool, Subscription | OrderItem | None]:
         async with httpx.AsyncClient(

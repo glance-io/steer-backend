@@ -52,3 +52,6 @@ class Customer(BaseLemonsqueezyDataModel):
 class CustomerResponse(BaseModel):
     data: Customer
 
+
+class CustomerListResponse(BaseModel):
+    data: list[Customer]
