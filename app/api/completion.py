@@ -1,3 +1,4 @@
+import uuid
 from typing import Annotated, List
 from fastapi import Depends, APIRouter, HTTPException
 from sse_starlette.sse import EventSourceResponse
@@ -32,8 +33,13 @@ async def rephrase_new(
         llm_service: LLMServiceBase = Depends(get_llm_service),
         usage_service: BaseFreeTierUsageService = Depends(get_usage_service)
 ):
+    is_valid_user_id = True
     try:
-        rewrite_service = RewriteService(request, llm_service, usage_service)
+        _ = uuid.UUID(request.uid)
+    except ValueError:
+        is_valid_user_id = False
+    try:
+        rewrite_service = RewriteService(request, llm_service, usage_service if is_valid_user_id else None)
         return EventSourceResponse(rewrite_service.rewrite(
             sse_formating=True)
         )
