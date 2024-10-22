@@ -2,7 +2,6 @@ import asyncio
 import datetime
 
 import sentry_sdk
-import structlog
 from fastapi import APIRouter, HTTPException, Depends
 from postgrest import APIError
 from starlette.responses import RedirectResponse
@@ -62,8 +61,11 @@ async def sign_in(data: SignInDTO, db: AsyncClient = Depends(SupabaseConnectionS
             )
 
     if created:
-        # noinspection PyAsyncCall
-        asyncio.create_task(check_existing_subscription(auth_user.id, auth_user.email))
+        try:
+            # noinspection PyAsyncCall
+            asyncio.create_task(check_existing_subscription(auth_user.id, auth_user.email))
+        except Exception as e:
+            sentry_sdk.capture_exception(e)
 
     return {"is_premium": user.is_premium}
 
