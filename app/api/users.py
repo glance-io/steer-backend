@@ -1,7 +1,7 @@
+import asyncio
 import datetime
 
 import sentry_sdk
-import structlog
 from fastapi import APIRouter, HTTPException, Depends
 from postgrest import APIError
 from starlette.responses import RedirectResponse
@@ -14,6 +14,8 @@ from app.repository.users_repository import UsersRepository, UserDoesNotExistErr
 from app.services.db.supabase import SupabaseConnectionService
 from app.services.lemon_squeezy_service import LemonSqueezyService
 from gotrue.types import User as AuthUser
+
+from app.tasks.check_subscription import check_existing_subscription
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -57,6 +59,13 @@ async def sign_in(data: SignInDTO, db: AsyncClient = Depends(SupabaseConnectionS
                 variant_id=subscription_detail.attributes.variant_id if subscription_detail else None,
                 tier=Tier.FREE if not is_premium else Tier.PREMIUM if not is_lifetime else Tier.LIFETIME
             )
+
+    if created:
+        try:
+            # noinspection PyAsyncCall
+            asyncio.create_task(check_existing_subscription(auth_user.id, auth_user.email))
+        except Exception as e:
+            sentry_sdk.capture_exception(e)
 
     return {"is_premium": user.is_premium}
 

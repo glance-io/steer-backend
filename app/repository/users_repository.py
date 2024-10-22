@@ -40,6 +40,16 @@ class UsersRepository:
                 raise UserDoesNotExistError()
             logger.error("Failed to get user", error=str(e))
 
+    async def get_user_by_email(self, email: str) -> User | None:
+        try:
+            response = await self.repository.select("*").eq("email", email).execute()
+            if not response.data or len(response.data) < 1:
+                return None
+            return User(**response.data[0])
+        except APIError as e:
+            logger.error("Failed to get user", error=str(e))
+            return None
+
     async def create_user(self, user_id: str, *args, **kwargs) -> User:
         try:
             response = await self.repository.insert(
