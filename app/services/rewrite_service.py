@@ -22,11 +22,13 @@ class RewriteService:
             self,
             rewrite_request: RephraseRequest,
             llm_service: LLMServiceBase,
-            usage_service: Optional[BaseFreeTierUsageService] = None
+            usage_service: Optional[BaseFreeTierUsageService] = None,
+            max_rewrite_temp: Optional[float] = 1
     ):
         self.rewrite_request = rewrite_request
         self.llm_service = llm_service
         self.usage_service = usage_service
+        self.max_rewrite_temp = max_rewrite_temp
 
     @staticmethod
     def _format_token(token, use_sse: bool):
@@ -51,11 +53,16 @@ class RewriteService:
             "event": "throttle"
         }
 
-    @staticmethod
-    def __get_temperature(task_type: RephraseTaskType):
-        return settings.fix_grammar_temperature \
+    def __get_temperature(self) -> float:
+        task_type = self.rewrite_request.completion_task_type
+        base_temperature = settings.fix_grammar_temperature \
             if task_type == RephraseTaskType.FIX_GRAMMAR\
             else settings.rephrase_temperature
+
+        if task_type != RephraseTaskType.FIX_GRAMMAR:
+            base_temperature *= 1 + 0.1 * len(self.rewrite_request.prev_rewrites) if self.rewrite_request.prev_rewrites else 1
+
+        return min(base_temperature, self.max_rewrite_temp)
 
     async def rewrite(self, sse_formating: Optional[bool] = True) -> AsyncGenerator[str, None]:
         logger.info("Rewriting started", task=self.rewrite_request.completion_task_type)
@@ -88,7 +95,7 @@ class RewriteService:
 
         response_generator = self.llm_service.generate_stream(
             messages=conversation_messages,
-            temperature=self.__get_temperature(self.rewrite_request.completion_task_type)
+            temperature=self.__get_temperature()
         )
         rewrite = ""
         async for response_delta in response_generator:
