@@ -4,4 +4,4 @@ from pydantic import BaseModel as PydanticBaseModel
 
 
 class StatsResDTO(PydanticBaseModel):
-    usage: int
+    usage: str

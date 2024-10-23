@@ -7,13 +7,13 @@ router = APIRouter(prefix="/stats", tags=["stats"])
 
 
 @router.get("/actions")
-async def get_actions():
+async def get_actions() -> StatsResDTO:
     """
     Endpoint for landing page to show usage statistics
-    :return:
+    :return: StatsResDTO
     """
     service = StatsService()
     usage = await service.get_total_usage()
     return StatsResDTO(
-        usage=usage,
+        usage=f"{usage:,}" ,
     )
