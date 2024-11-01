@@ -57,7 +57,7 @@ The application will be available at `http://localhost:80` exposed with Nginx.
 
 The project is structured into several modules and services. For people interested only in LLM integration, the most interesting parst will be:
 
-- [LLM service](app/services/openai_service.py)
+- [LLM service](app/services/llm/openai_service.py)
 - [Rewrite service](app/services/rewrite_service.py)
 
 Endpoint documentation is available at `/docs` when the application is running.
