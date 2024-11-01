@@ -6,7 +6,7 @@ from app.depends.llm import get_llm_service
 from app.depends.usage import get_usage_service
 from app.services.rewrite_service import RewriteService
 from app.services.text_highlighting_service import TextHighlightingService
-from app.services.llm_service import LLMServiceBase
+from app.services.llm.llm_service import LLMServiceBase
 from app.models.completion import RephraseRequest
 import structlog
 

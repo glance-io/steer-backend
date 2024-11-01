@@ -5,7 +5,7 @@ import structlog
 
 from app.models.message import BaseChatMessage
 from app.settings import settings
-from app.services.llm_service import LLMServiceBase
+from app.services.llm.llm_service import LLMServiceBase
 
 logger = structlog.get_logger(__name__)
 

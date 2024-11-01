@@ -1,6 +1,6 @@
-from app.services.anthropic_service import AnthropicService
-from app.services.llm_service import LLMServiceBase
-from app.services.openai_service import AsyncOpenAIService
+from app.services.llm.anthropic_service import AnthropicService
+from app.services.llm.llm_service import LLMServiceBase
+from app.services.llm.openai_service import AsyncOpenAIService
 from app.settings import settings, LLMProvider
 
 
