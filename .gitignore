@@ -2,7 +2,10 @@
 .idea
 .venv
 __pycache__
+# config files
 config.yaml
+prompts.yaml
+
 prompts/*
 /.python-version
 certs/*

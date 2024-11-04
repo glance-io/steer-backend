@@ -4,6 +4,7 @@ from fastapi import Depends, APIRouter, HTTPException
 from sse_starlette.sse import EventSourceResponse
 from app.depends.llm import get_llm_service
 from app.depends.usage import get_usage_service
+from app.services.rewrite.rewrite_manager import RewriteManager
 from app.services.rewrite_service import RewriteService
 from app.services.text_highlighting_service import TextHighlightingService
 from app.services.llm.llm_service import LLMServiceBase
@@ -39,10 +40,8 @@ async def rephrase_new(
     except ValueError:
         is_valid_user_id = False
     try:
-        rewrite_service = RewriteService(request, llm_service, usage_service if is_valid_user_id else None)
-        return EventSourceResponse(rewrite_service.rewrite(
-            sse_formating=True)
-        )
+        rewrite_service = RewriteManager(usage_service=usage_service if is_valid_user_id else None)
+        return EventSourceResponse(rewrite_service.rewrite(request))
     except Exception as e:
         logger.error(f"Error in rephrase: {e}")
         raise HTTPException(status_code=500, detail=str(e))
