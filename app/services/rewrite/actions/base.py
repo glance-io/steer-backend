@@ -11,6 +11,12 @@ from app.services.prompt_service import PromptService
 logger = structlog.get_logger(__name__)
 
 
+class ActionFailed(Exception):
+    def __init__(self, type: RephraseTaskType, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.type = type
+
+
 class BaseRephraseAction(abc.ABC):
     base_temperature: float
     max_rewrite_temp: float
@@ -37,5 +43,4 @@ class BaseRephraseAction(abc.ABC):
             async for event, content in self._perform(original_message, prev_rewrites):
                 yield event, content
         except Exception as e:
-            sentry_sdk.capture_exception(e)
-            logger.error("Action failed", error=str(e))
+            raise ActionFailed(self.task_type, str(e))

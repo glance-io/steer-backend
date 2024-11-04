@@ -6,3 +6,4 @@ class SSEEvent(str, Enum):
     EOS = "eos"
     THROTTLE = "throttle"
     EXTRA = "extra"
+    ERROR = "error"
