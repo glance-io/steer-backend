@@ -32,7 +32,7 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(
         env_file=get_project_root() / ".env",
-        yaml_file=get_project_root() / "config.yaml"
+        yaml_file=[get_project_root() / "config.yaml", get_project_root() / "prompts.yaml"]
     )
 
     @classmethod

@@ -1,7 +1,8 @@
 import abc
-from typing import List, Optional, AsyncGenerator
+from typing import List, Optional, AsyncGenerator, Tuple
 
 from app.models.message import SystemMessage, UserMessage
+from app.models.sse import SSEEvent
 from app.services.llm.llm_service import LLMServiceBase
 from app.services.rewrite.actions.base import BaseRephraseAction
 from app.settings import settings
@@ -13,7 +14,7 @@ class BaseLLMAction(BaseRephraseAction):
     action_prompt: str
     _is_creative_rewrite: bool = False
 
-    def __innit__(self, llm_service: LLMServiceBase):
+    def __init__(self, llm_service: LLMServiceBase):
         self.llm_service = llm_service
 
     async def _perform(
@@ -21,7 +22,7 @@ class BaseLLMAction(BaseRephraseAction):
             original_message: str,
             prev_rewrites: List[str] | None,
             application: Optional[str] = None
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[Tuple[SSEEvent, str], None]:
         temperature = self._get_temperature(prev_rewrites)
         messages = self._get_messages(original_message, prev_rewrites, application)
         response_generator = self.llm_service.generate_stream(
@@ -29,7 +30,7 @@ class BaseLLMAction(BaseRephraseAction):
             temperature=temperature
         )
         async for response in response_generator:
-            yield response
+            yield SSEEvent.DATA,  response
 
     def _get_temperature(self, prev_rewrites: List[str] | None) -> float:
         base_temperature = self.base_temperature

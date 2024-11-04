@@ -5,8 +5,15 @@ import sentry_sdk
 import structlog
 
 from app.models.completion import RephraseTaskType, RephraseRequest
+from app.models.sse import SSEEvent
+from app.services.llm.anthropic_service import AnthropicService
+from app.services.llm.openai_service import AsyncOpenAIService
+from app.services.rewrite.actions.advanced_improve_writing_service import AdvancedImproveAction
 from app.services.rewrite.actions.base import BaseRephraseAction
+from app.services.rewrite.actions.concise_service import ConciseAction
+from app.services.rewrite.actions.proofread_action import ProofreadAction
 from app.services.usage.free_tier_usage.base import BaseFreeTierUsageService
+from app.settings import LLMProvider, settings
 
 logger = structlog.get_logger(__name__)
 
@@ -16,7 +23,15 @@ class UnsupportedRewriteAction(Exception):
 
 
 class RewriteManager:
-    actions_mapping: Dict[RephraseTaskType, BaseRephraseAction] = {}
+    actions_mapping: Dict[RephraseTaskType, BaseRephraseAction] = {
+        RephraseTaskType.FIX_GRAMMAR: ProofreadAction(
+            llm_service=AsyncOpenAIService() if settings.llm_provider == LLMProvider.OPENAI.value else AnthropicService(),
+        ),
+        RephraseTaskType.CONCISE: ConciseAction(
+            llm_service=AsyncOpenAIService() if settings.llm_provider == LLMProvider.OPENAI.value else AnthropicService(),
+        ),
+        RephraseTaskType.REPHRASE: AdvancedImproveAction()
+    }
 
     def __init__(
             self,
@@ -30,26 +45,26 @@ class RewriteManager:
         self._streaming_sleep = streaming_sleep
         self._sse_formatting = sse_formatting
 
-    def _format_token(self, token):
-        if self._sse_formatting:
-            return {
-                "data": token,
-                "event": "data"
-            }
-        return token
-
     @staticmethod
     def _sse_end_of_stream():
         return {
             "data": "end of stream",
-            "event": "eos"
+            "event": SSEEvent.EOS.value
         }
+
+    def _format_content(self, event: SSEEvent | str, content: str):
+        if self._sse_formatting:
+            return {
+                "data": content,
+                "event": event.value if isinstance(event, SSEEvent) else event
+            }
+        return content
 
     @staticmethod
     def _sse_throttle():
         return {
             "data": "throttle",
-            "event": "throttle"
+            "event": SSEEvent.THROTTLE.value
         }
 
     async def rewrite(self, rephrase_request: RephraseRequest) -> AsyncGenerator[str, None]:
@@ -75,9 +90,10 @@ class RewriteManager:
                 f"Unsupported task type {rephrase_request.completion_task_type}"
             )
 
-        async for token in action.perform(rephrase_request):
-            yield self._format_token(token)
-            await asyncio.sleep(self._streaming_sleep)
+        async for event, sse_chunk in action.perform(rephrase_request.text, prev_rewrites=rephrase_request.prev_rewrites):
+            yield self._format_content(event, sse_chunk)
+            if not is_user_allowed:
+                await asyncio.sleep(self._streaming_sleep)
 
         if self._sse_formatting:
             yield self._sse_end_of_stream()
