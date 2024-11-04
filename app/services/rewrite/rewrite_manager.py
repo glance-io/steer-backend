@@ -8,9 +8,9 @@ from app.models.completion import RephraseTaskType, RephraseRequest
 from app.models.sse import SSEEvent
 from app.services.llm.anthropic_service import AnthropicService
 from app.services.llm.openai_service import AsyncOpenAIService
-from app.services.rewrite.actions.advanced_improve_writing_service import AdvancedImproveAction
+from app.services.rewrite.actions.advanced_improve_writing_action import AdvancedImproveAction
 from app.services.rewrite.actions.base import BaseRephraseAction, ActionFailed
-from app.services.rewrite.actions.concise_service import ConciseAction
+from app.services.rewrite.actions.concise_action import ConciseAction
 from app.services.rewrite.actions.improve_writing_action import ImproveWritingAction
 from app.services.rewrite.actions.proofread_action import ProofreadAction
 from app.services.usage.free_tier_usage.base import BaseFreeTierUsageService

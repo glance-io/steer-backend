@@ -29,17 +29,17 @@ class AdvancedImproveAction(BaseRephraseAction):
 
     _analyze_temp = _rewrite_temp = _humanize_temp = base_temperature
 
+    _default_writing_style = "natural style, direct and clear"
+
     _inputs = RunnableParallel({
         "original_message": lambda inputs: inputs.get("original_message"),
-        "writing_style": lambda inputs: inputs.get("writing_style"),
-        "profession": lambda inputs: inputs.get("profession"),
+        "writing_style": lambda inputs: inputs.get("writing_style") or AdvancedImproveAction._default_writing_style,
         "app_name": lambda inputs: inputs.get("app_name"),
         "prompt": _analyze_prompt,
     }).with_types(input_type=ChainInputs)
 
     _analysis = RunnableParallel({
         "original_message": lambda x: x.get('original_message'),
-        "profession": lambda x: x.get('profession'),
         "app_name": lambda x: x.get('app_name'),
         "writing_style": lambda x: x.get('writing_style'),
         "analysis": lambda x: AdvancedImproveAction.get_llm(
@@ -112,7 +112,6 @@ class AdvancedImproveAction(BaseRephraseAction):
         chain = self.get_chain()
         async for event in chain.astream_events({
             "original_message": original_message,
-            "profession": "startup founder",
             "app_name": application,
             "writing_style": "simple, direct and clear"
         }, version="v2"):
