@@ -9,8 +9,9 @@ from app.models.sse import SSEEvent
 from app.services.llm.anthropic_service import AnthropicService
 from app.services.llm.openai_service import AsyncOpenAIService
 from app.services.rewrite.actions.advanced_improve_writing_service import AdvancedImproveAction
-from app.services.rewrite.actions.base import BaseRephraseAction
+from app.services.rewrite.actions.base import BaseRephraseAction, ActionFailed
 from app.services.rewrite.actions.concise_service import ConciseAction
+from app.services.rewrite.actions.improve_writing_action import ImproveWritingAction
 from app.services.rewrite.actions.proofread_action import ProofreadAction
 from app.services.usage.free_tier_usage.base import BaseFreeTierUsageService
 from app.settings import LLMProvider, settings
@@ -23,15 +24,21 @@ class UnsupportedRewriteAction(Exception):
 
 
 class RewriteManager:
-    actions_mapping: Dict[RephraseTaskType, BaseRephraseAction] = {
-        RephraseTaskType.FIX_GRAMMAR: ProofreadAction(
-            llm_service=AsyncOpenAIService() if settings.llm_provider == LLMProvider.OPENAI.value else AnthropicService(),
-        ),
-        RephraseTaskType.CONCISE: ConciseAction(
-            llm_service=AsyncOpenAIService() if settings.llm_provider == LLMProvider.OPENAI.value else AnthropicService(),
-        ),
-        RephraseTaskType.REPHRASE: AdvancedImproveAction()
-    }
+    llm_service = AsyncOpenAIService() if settings.llm_provider == LLMProvider.OPENAI.value else AnthropicService()
+    actions_mapping: Dict[RephraseTaskType, BaseRephraseAction] = {}
+
+    @classmethod
+    def _init_actions_mapping(cls):
+        actions_mapping: Dict[RephraseTaskType, BaseRephraseAction] = {
+            RephraseTaskType.FIX_GRAMMAR: ProofreadAction(
+                llm_service=cls.llm_service,
+            ),
+            RephraseTaskType.CONCISE: ConciseAction(
+                llm_service=cls.llm_service,
+            ),
+            RephraseTaskType.REPHRASE: AdvancedImproveAction()
+        }
+        return actions_mapping
 
     def __init__(
             self,
@@ -44,6 +51,8 @@ class RewriteManager:
         self._initial_sleep = initial_sleep
         self._streaming_sleep = streaming_sleep
         self._sse_formatting = sse_formatting
+        if not self.actions_mapping:
+            self.actions_mapping = self._init_actions_mapping()
 
     @staticmethod
     def _sse_end_of_stream():
@@ -90,10 +99,22 @@ class RewriteManager:
                 f"Unsupported task type {rephrase_request.completion_task_type}"
             )
 
-        async for event, sse_chunk in action.perform(rephrase_request.text, prev_rewrites=rephrase_request.prev_rewrites):
-            yield self._format_content(event, sse_chunk)
-            if not is_user_allowed:
-                await asyncio.sleep(self._streaming_sleep)
+        try:
+            async for event, sse_chunk in action.perform(rephrase_request.text, prev_rewrites=rephrase_request.prev_rewrites):
+                yield self._format_content(event, sse_chunk)
+                if not is_user_allowed:
+                    await asyncio.sleep(self._streaming_sleep)
+        except ActionFailed as e:
+            sentry_sdk.capture_exception(e)
+            logger.error("Action failed", error=str(e))
+            if e.type == RephraseTaskType.REPHRASE:
+                fallback_action = ImproveWritingAction(
+                    llm_service=self.llm_service
+                )
+                async for event, sse_chunk in fallback_action.perform(rephrase_request.text, prev_rewrites=rephrase_request.prev_rewrites):
+                    yield self._format_content(event, sse_chunk)
+            else:
+                yield self._format_content(SSEEvent.ERROR, str(e))
 
         if self._sse_formatting:
             yield self._sse_end_of_stream()

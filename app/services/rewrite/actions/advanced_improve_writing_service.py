@@ -1,24 +1,33 @@
-from typing import AsyncGenerator, Optional, List
+from typing import AsyncGenerator, Optional, List, Tuple
 
+import sentry_sdk
+import structlog
 from langchain_core.prompts import PromptTemplate
 from langchain_core.runnables import Runnable, RunnableParallel, RunnableLambda
 from langchain_openai import ChatOpenAI
+from openai import OpenAI
 from pydantic import BaseModel
 
 from app.models.actions.advanced_improve import ChainInputs
+from app.models.completion import RephraseTaskType
 from app.models.sse import SSEEvent
+from app.services.llm.anthropic_service import AnthropicService
+from app.services.llm.openai_service import AsyncOpenAIService
 from app.services.rewrite.actions.base import BaseRephraseAction
+from app.services.rewrite.actions.improve_writing_action import ImproveWritingAction
 from app.settings import LLMProvider, settings
 
 
 class AdvancedImproveAction(BaseRephraseAction):
+    task_type = RephraseTaskType.REPHRASE
+    base_temperature = 0.5
+    max_rewrite_temp = 0.5
+
     _analyze_prompt = PromptTemplate.from_template(settings.prompts.advanced_improve_prompt.analyze_prompt)
     _rewrite_prompt = PromptTemplate.from_template(settings.prompts.advanced_improve_prompt.rewrite_prompt)
     _humanize_prompt = PromptTemplate.from_template(settings.prompts.advanced_improve_prompt.humanize_prompt)
 
-    _analyze_temp = 0.5
-    _rewrite_temp = 0.5
-    _humanize_temp = 0.5
+    _analyze_temp = _rewrite_temp = _humanize_temp = base_temperature
 
     _inputs = RunnableParallel({
         "original_message": lambda inputs: inputs.get("original_message"),
@@ -56,6 +65,11 @@ class AdvancedImproveAction(BaseRephraseAction):
         ).invoke(x.get("prompt"))
     })
     _improve.name = "Improve"
+
+    # FIXME: The fallback action probably shouldn't be in this class but in the manager
+    fallback_action = ImproveWritingAction(
+        llm_service=AsyncOpenAIService() if settings.llm_provider == LLMProvider.OPENAI.value else AnthropicService()
+    )
 
     def get_chain(self) -> Runnable:
         humanize_llm = self.get_llm(self._humanize_temp, name="Humanize")
