@@ -13,3 +13,4 @@ class AnalyzeOutput(BaseModel):
     vocabulary: str
     formality: str
     goal: str
+    language: str

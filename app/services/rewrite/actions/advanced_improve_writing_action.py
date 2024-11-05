@@ -1,14 +1,11 @@
-from typing import AsyncGenerator, Optional, List, Tuple
+from typing import AsyncGenerator, Optional, List, Tuple, Type, Any, Dict
 
-import sentry_sdk
-import structlog
+from langchain_core.prompt_values import PromptValue
 from langchain_core.prompts import PromptTemplate
 from langchain_core.runnables import Runnable, RunnableParallel, RunnableLambda
 from langchain_openai import ChatOpenAI
-from openai import OpenAI
-from pydantic import BaseModel
 
-from app.models.actions.advanced_improve import ChainInputs
+from app.models.actions.advanced_improve import ChainInputs, AnalyzeOutput
 from app.models.completion import RephraseTaskType
 from app.models.sse import SSEEvent
 from app.services.llm.anthropic_service import AnthropicService
@@ -36,23 +33,25 @@ class AdvancedImproveAction(BaseRephraseAction):
         "writing_style": lambda inputs: inputs.get("writing_style") or AdvancedImproveAction._default_writing_style,
         "app_name": lambda inputs: inputs.get("app_name"),
         "prompt": _analyze_prompt,
+        "prev_rewrites": lambda inputs: inputs.get("prev_rewrites")
     }).with_types(input_type=ChainInputs)
 
     _analysis = RunnableParallel({
         "original_message": lambda x: x.get('original_message'),
         "app_name": lambda x: x.get('app_name'),
         "writing_style": lambda x: x.get('writing_style'),
+        "prev_rewrites": lambda x: x.get('prev_rewrites'),
         "analysis": lambda x: AdvancedImproveAction.get_llm(
             AdvancedImproveAction._analyze_temp,
             name="Analysis",
-            structure=...
+            structure=AnalyzeOutput
         ).invoke(x.get("prompt"))
     })
     _analysis.name = "Analysis"
 
     _rewrite = RunnableParallel({
         "prompt": RunnableLambda(
-            lambda x: AdvancedImproveAction._rewrite_prompt.invoke({**(x.pop("analysis")), **x})
+            lambda x: AdvancedImproveAction._get_rephrase_prompt({**(x.pop("analysis")).dict(), **x}, x.get("prev_rewrites"))
         ),
         "original_message": lambda x: x.get("original_message")
     } )
@@ -73,7 +72,6 @@ class AdvancedImproveAction(BaseRephraseAction):
 
     def get_chain(self) -> Runnable:
         humanize_llm = self.get_llm(self._humanize_temp, name="Humanize")
-
         chain = (
                 self._inputs |
                 self._analysis |
@@ -82,11 +80,22 @@ class AdvancedImproveAction(BaseRephraseAction):
                 self._humanize_prompt |
                 humanize_llm
         )
-
         return chain
 
     @classmethod
-    def get_llm(cls, temp: float, name: Optional[str] = None, structure: Optional[BaseModel] = None) -> ChatOpenAI:
+    def _get_rephrase_prompt(cls, input: Dict[str, Any], prev_rewrites: List[str] | None) -> PromptValue:
+        if prev_rewrites:
+            prompt = cls._rewrite_prompt + (
+                    "\n" +
+                    "These were the previously revised texts which user wasn't happy with, generate different rewrites with similar meaning: " +
+                    "\n".join(prev_rewrites)
+            )
+        else:
+            prompt = cls._rewrite_prompt
+        return prompt.invoke(input)
+
+    @classmethod
+    def get_llm(cls, temp: float, name: Optional[str] = None, structure: Optional[Type] = None) -> ChatOpenAI:
         if settings.llm_provider == LLMProvider.OPENAI:
             model = ChatOpenAI(
                 api_key=settings.llm_api_key,
@@ -113,7 +122,8 @@ class AdvancedImproveAction(BaseRephraseAction):
         async for event in chain.astream_events({
             "original_message": original_message,
             "app_name": application,
-            "writing_style": "simple, direct and clear"
+            "writing_style": self._default_writing_style,
+            "prev_rewrites": prev_rewrites
         }, version="v2"):
             if event['event'] == 'on_chat_model_stream' and event['name'] == 'Humanize':
                 yield SSEEvent.DATA,  event['data']['chunk'].content
