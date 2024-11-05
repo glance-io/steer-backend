@@ -1,4 +1,4 @@
-from typing import AsyncGenerator, Optional, List, Tuple, Type, Any, Dict
+from typing import AsyncGenerator, Optional, List, Type, Any, Dict
 
 from langchain_core.prompt_values import PromptValue
 from langchain_core.prompts import PromptTemplate
@@ -8,10 +8,7 @@ from langchain_openai import ChatOpenAI
 from app.models.actions.advanced_improve import ChainInputs, AnalyzeOutput
 from app.models.completion import RephraseTaskType
 from app.models.sse import SSEEvent
-from app.services.llm.anthropic_service import AnthropicService
-from app.services.llm.openai_service import AsyncOpenAIService
 from app.services.rewrite.actions.base import BaseRephraseAction
-from app.services.rewrite.actions.improve_writing_action import ImproveWritingAction
 from app.settings import LLMProvider, settings
 
 
@@ -64,11 +61,6 @@ class AdvancedImproveAction(BaseRephraseAction):
         ).invoke(x.get("prompt"))
     })
     _improve.name = "Improve"
-
-    # FIXME: The fallback action probably shouldn't be in this class but in the manager
-    fallback_action = ImproveWritingAction(
-        llm_service=AsyncOpenAIService() if settings.llm_provider == LLMProvider.OPENAI.value else AnthropicService()
-    )
 
     def get_chain(self) -> Runnable:
         humanize_llm = self.get_llm(self._humanize_temp, name="Humanize")
