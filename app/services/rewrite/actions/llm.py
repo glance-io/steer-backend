@@ -45,7 +45,12 @@ class BaseLLMAction(BaseRephraseAction):
     ):
         is_one_word = len(original_message.split()) == 1
         if is_one_word:
-            return "\n\n".join([settings.prompts.base_system_prompt, settings.one_word_prompt])
+            return f"""
+            {settings.prompts.one_word_prompt}
+            
+            original word:
+            {original_message}
+            """
 
         action = self.action_prompt
         if application and self._is_creative_rewrite:
