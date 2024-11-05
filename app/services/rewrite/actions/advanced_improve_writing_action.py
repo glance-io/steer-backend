@@ -13,7 +13,7 @@ from app.settings import LLMProvider, settings
 
 
 class AdvancedImproveAction(BaseRephraseAction):
-    task_type = RephraseTaskType.REPHRASE
+    task_type = RephraseTaskType.ADVANCED_IMPROVE
     base_temperature = 0.5
     max_rewrite_temp = 0.5
 
