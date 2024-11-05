@@ -120,4 +120,4 @@ class AdvancedImproveAction(BaseRephraseAction):
             if event['event'] == 'on_chat_model_stream' and event['name'] == 'Humanize':
                 yield SSEEvent.DATA,  event['data']['chunk'].content
             elif event['event'] == 'on_chat_model_end' and event['name'] == 'Analysis':
-                yield SSEEvent.EXTRA, event['data']['output'].content
+                yield SSEEvent.ANALYSIS, event['data']['output'].content

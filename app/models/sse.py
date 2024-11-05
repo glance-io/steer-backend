@@ -5,5 +5,5 @@ class SSEEvent(str, Enum):
     DATA = "data"
     EOS = "eos"
     THROTTLE = "throttle"
-    EXTRA = "extra"
+    ANALYSIS = "analysis"
     ERROR = "error"
