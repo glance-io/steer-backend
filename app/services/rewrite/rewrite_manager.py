@@ -114,7 +114,7 @@ class RewriteManager:
                 async for event, sse_chunk in fallback_action.perform(rephrase_request.text, prev_rewrites=rephrase_request.prev_rewrites):
                     yield self._format_content(event, sse_chunk)
             else:
-                yield self._format_content(SSEEvent.ERROR, str(e))
+                raise e
 
         if self._sse_formatting:
             yield self._sse_end_of_stream()
