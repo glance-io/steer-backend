@@ -36,7 +36,10 @@ class RewriteManager:
             RephraseTaskType.CONCISE: ConciseAction(
                 llm_service=cls.llm_service,
             ),
-            RephraseTaskType.REPHRASE: AdvancedImproveAction()
+            RephraseTaskType.REPHRASE: ImproveWritingAction(
+                llm_service=cls.llm_service,
+            ),
+            RephraseTaskType.ADVANCED_IMPROVE: AdvancedImproveAction()
         }
         return actions_mapping
 
@@ -107,7 +110,8 @@ class RewriteManager:
         except ActionFailed as e:
             sentry_sdk.capture_exception(e)
             logger.error("Action failed", error=str(e))
-            if e.type == RephraseTaskType.REPHRASE:
+            # Fallback to improve writing action
+            if e.type == RephraseTaskType.ADVANCED_IMPROVE:
                 fallback_action = ImproveWritingAction(
                     llm_service=self.llm_service
                 )

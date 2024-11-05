@@ -4,7 +4,7 @@ from app.settings import settings
 
 
 class ImproveWritingAction(BaseLLMAction):
-    task_type = RephraseTaskType.REPHRASE_OLD
+    task_type = RephraseTaskType.REPHRASE
     action_prompt = settings.prompts.rephrase_prompt
     base_temperature = settings.rephrase_temperature
     max_rewrite_temp = 1
