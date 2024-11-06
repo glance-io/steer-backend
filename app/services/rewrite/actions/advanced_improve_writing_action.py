@@ -1,6 +1,5 @@
 from typing import AsyncGenerator, Optional, List, Type, Any, Dict
 
-from langchain_core.prompt_values import PromptValue
 from langchain_core.prompts import PromptTemplate
 from langchain_core.runnables import Runnable, RunnableParallel, RunnableLambda
 from langchain_openai import ChatOpenAI
@@ -58,7 +57,7 @@ class AdvancedImproveAction(BaseRephraseAction):
         "original_message": lambda x: x.get("original_message"),
         "improved_message": lambda x: AdvancedImproveAction.get_llm(
             AdvancedImproveAction._rewrite_temp
-        ).invoke(x.get("prompt"))
+        ).invoke(x.get("prompt")).content
     })
     _improve.name = "Improve"
 
@@ -75,7 +74,7 @@ class AdvancedImproveAction(BaseRephraseAction):
         return chain
 
     @classmethod
-    def _get_rephrase_prompt(cls, input: Dict[str, Any], prev_rewrites: List[str] | None) -> PromptValue:
+    def _get_rephrase_prompt(cls, input: Dict[str, Any], prev_rewrites: List[str] | None) -> str:
         if prev_rewrites:
             prompt = cls._rewrite_prompt + (
                     "\n" +
@@ -84,7 +83,7 @@ class AdvancedImproveAction(BaseRephraseAction):
             )
         else:
             prompt = cls._rewrite_prompt
-        return prompt.invoke(input)
+        return prompt.invoke(input).to_string()
 
     @classmethod
     def get_llm(cls, temp: float, name: Optional[str] = None, structure: Optional[Type] = None) -> ChatOpenAI:
