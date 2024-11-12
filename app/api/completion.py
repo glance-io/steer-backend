@@ -1,5 +1,7 @@
 import uuid
 from typing import Annotated, List
+
+import sentry_sdk
 from fastapi import Depends, APIRouter, HTTPException
 from sse_starlette.sse import EventSourceResponse
 from app.depends.llm import get_llm_service
@@ -37,7 +39,8 @@ async def rephrase_new(
     is_valid_user_id = True
     try:
         _ = uuid.UUID(request.uid)
-    except ValueError:
+    except ValueError as e:
+        sentry_sdk.capture_exception(e)
         is_valid_user_id = False
     try:
         rewrite_service = RewriteManager(usage_service=usage_service if is_valid_user_id else None)
