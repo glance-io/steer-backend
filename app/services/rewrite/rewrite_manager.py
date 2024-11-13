@@ -122,3 +122,6 @@ class RewriteManager:
 
         if self._sse_formatting:
             yield self._sse_end_of_stream()
+
+        if self.usage_service:
+            await self.usage_service.update_user_usage(user_id=rephrase_request.uid, usage_delta=1)

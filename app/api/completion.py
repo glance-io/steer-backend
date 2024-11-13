@@ -40,7 +40,7 @@ async def rephrase_new(
     try:
         _ = uuid.UUID(request.uid)
     except ValueError as e:
-        sentry_sdk.capture_exception(e)
+        sentry_sdk.capture_message(f'Invalid user id - {request.uid}, {repr(e)}')
         is_valid_user_id = False
     try:
         rewrite_service = RewriteManager(usage_service=usage_service if is_valid_user_id else None)
