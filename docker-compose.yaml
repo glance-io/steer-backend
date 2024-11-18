@@ -31,6 +31,8 @@ services:
 
   redis:
     image: "redis:alpine"
+    networks:
+      - steer
 
 networks:
   steer:
