@@ -11,6 +11,8 @@ services:
     environment:
         - REDIS_HOST=redis
         - REDIS_PORT=6379
+    networks:
+      - steer
 
   nginx:
     image: nginx:1.21.1-alpine
@@ -22,7 +24,18 @@ services:
       - 443:443
     depends_on:
       - web
+    networks:
+      - steer
+      - electron-updater
 
 
   redis:
     image: "redis:alpine"
+
+networks:
+  steer:
+    driver: bridge
+  electron-updater:
+    name: electron-release-server_electron-updater
+    external: true
+
