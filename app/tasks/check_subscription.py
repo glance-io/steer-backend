@@ -1,5 +1,6 @@
 import httpx
 import structlog
+from sentry_sdk import capture_message, capture_exception
 
 from app.models.lemonsqueezy.subscription import SubscriptionResponse, SubscriptionMultiResponse
 from app.models.tier import Tier
@@ -20,6 +21,7 @@ async def check_existing_subscription(user_id: str, user_email: str):
     async with ls_api_service.get_http_client() as client:
         customer = await ls_api_service.get_customer_by_email(user_email, client)
         if not customer:
+            capture_message(f"Failed to get customer by email: {user_email}")
             return None
 
         if not customer.relationships.subscriptions.links:
@@ -34,9 +36,11 @@ async def check_existing_subscription(user_id: str, user_email: str):
             ) if data else None
         except httpx.HTTPStatusError as e:
             logger.warning("Failed to get subscription", user_email=user_email, status_code=e.response.status_code)
+            capture_exception(e)
 
         for subscription in subscriptions.data:
             if subscription.attributes.status in ls_api_service.subscription_active_states:
+                variant, price = await ls_api_service.get_product_variant_detail(subscription.attributes.variant_id, client)
                 await users_repository.update_user(
                     user_id=str(user_id),
                     is_premium=True,
@@ -44,6 +48,6 @@ async def check_existing_subscription(user_id: str, user_email: str):
                     subscription_id=subscription.id,
                     lemonsqueezy_id=subscription.attributes.customer_id,
                     variant_id=subscription.attributes.variant_id,
-                    tier=Tier.PREMIUM if not subscription.attributes.is_lifetime else Tier.LIFETIME
+                    tier=Tier.PREMIUM if not price.attributes.is_lifetime else Tier.LIFETIME
                 )
                 return

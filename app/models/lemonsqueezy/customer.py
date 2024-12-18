@@ -15,7 +15,7 @@ class StatusEnum(str, Enum):
 
 
 class Urls(BaseModel):
-    customer_portal: str
+    customer_portal: Optional[str] = None
 
 
 class CustomerAttributes(BaseModel):

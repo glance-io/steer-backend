@@ -29,7 +29,7 @@ async def lemonsqueezy_webhook(
         validation_signature = hmac.new(settings.lemonsqueezy_webhook_secret.encode(), await req.body(), "sha256").hexdigest()
         if not hmac.compare_digest(signature, validation_signature):
             loggger.error("Invalid signature", signature=signature, validation_signature=validation_signature)
-            set_context({"signature": signature, "validation_signature": validation_signature, "data": data})
+            set_context("ls_webhook", {"signature": signature, "validation_signature": validation_signature, "data": data})
             capture_message("Invalid signature")
             raise HTTPException(status_code=403, detail="Invalid signature")
 
