@@ -25,9 +25,13 @@ async def check_existing_subscription(user_id: str, user_email: str):
     )
     async with ls_api_service.get_http_client() as client:
         customer = await ls_api_service.get_customer_by_email(user_email, client)
+        if not customer:
+            return None
         payment_records = await payments_repository.get_records_by_email(user_email)
-        if payment_records and not customer:
-            capture_message(f"Failed to get customer by email: {user_email}")
+        if not customer:
+            logger.warning("Failed to get customer by email", user_email=user_email)
+            if payment_records:
+                capture_message(f"Failed to get customer by email: {user_email}")
             return None
 
         if not customer.relationships.subscriptions.links:
