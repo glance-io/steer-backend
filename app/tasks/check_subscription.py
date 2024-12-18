@@ -4,6 +4,7 @@ from sentry_sdk import capture_message, capture_exception
 
 from app.models.lemonsqueezy.subscription import SubscriptionResponse, SubscriptionMultiResponse
 from app.models.tier import Tier
+from app.repository.payments_repository import PaymentsRepository
 from app.repository.users_repository import UsersRepository
 from app.services.db.supabase import SupabaseConnectionService
 from app.services.lemon_squeezy_service import LemonSqueezyService
@@ -15,12 +16,17 @@ logger = structlog.get_logger(__name__)
 async def check_existing_subscription(user_id: str, user_email: str):
     logger.info("")
     ls_api_service = LemonSqueezyService()
+    db = await SupabaseConnectionService().connect()
     users_repository = UsersRepository(
-        await SupabaseConnectionService().connect()
+        db
+    )
+    payments_repository = PaymentsRepository(
+        db
     )
     async with ls_api_service.get_http_client() as client:
         customer = await ls_api_service.get_customer_by_email(user_email, client)
-        if not customer:
+        payment_records = await payments_repository.get_records_by_email(user_email)
+        if payment_records and not customer:
             capture_message(f"Failed to get customer by email: {user_email}")
             return None
 
