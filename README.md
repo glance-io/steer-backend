@@ -59,5 +59,6 @@ The project is structured into several modules and services. For people interest
 
 - [LLM service](app/services/llm/openai_service.py)
 - [Rewrite service](app/services/rewrite_service.py)
+- [Usage service](app/services/usage/free_tier_usage/free_tier_usage_service_with_cache.py)
 
 Endpoint documentation is available at `/docs` when the application is running.
