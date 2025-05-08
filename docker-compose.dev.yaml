@@ -10,23 +10,11 @@ services:
     environment:
         - REDIS_HOST=redis
         - REDIS_PORT=6379
-    networks:
-      - steer
-
-  # Nginx reverse proxy for SSL termination and request routing
-  nginx:
-    image: nginx:1.21.1-alpine
-    volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./certs/:/etc/nginx/certs/
+    # Map port 8000 on host to port 80 in container (for local development)
     ports:
-      - 80:80
-      - 443:443
-    depends_on:
-      - web
+      - "8000:80"
     networks:
       - steer
-      - electron-updater
 
   # Redis for caching and message broker
   redis:
@@ -38,8 +26,3 @@ networks:
   # Internal network for backend services
   steer:
     driver: bridge
-  # External network for electron app updates
-  electron-updater:
-    name: electron-release-server_electron-updater
-    external: true
-
