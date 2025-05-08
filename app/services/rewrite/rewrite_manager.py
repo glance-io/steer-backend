@@ -36,7 +36,7 @@ class RewriteManager:
             RephraseTaskType.CONCISE: ConciseAction(
                 llm_service=cls.llm_service,
             ),
-            RephraseTaskType.REPHRASE: ImproveWritingAction(
+            RephraseTaskType.REPHRASE: ImproveWritingAction( # TODO: Remove this deprecated action
                 llm_service=cls.llm_service,
             ),
             RephraseTaskType.ADVANCED_IMPROVE: AdvancedImproveAction()

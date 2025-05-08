@@ -7,7 +7,6 @@ from sse_starlette.sse import EventSourceResponse
 from app.depends.llm import get_llm_service
 from app.depends.usage import get_usage_service
 from app.services.rewrite.rewrite_manager import RewriteManager
-from app.services.rewrite_service import RewriteService
 from app.services.text_highlighting_service import TextHighlightingService
 from app.services.llm.llm_service import LLMServiceBase
 from app.models.completion import RephraseRequest
@@ -18,16 +17,6 @@ from app.services.usage.free_tier_usage.base import BaseFreeTierUsageService
 router = APIRouter(prefix="/completion", tags=["completion"])
 
 logger = structlog.get_logger(__name__)
-
-
-@router.post("/rephrase")
-async def rephrase(request: RephraseRequest, llm_service: LLMServiceBase = Depends(get_llm_service)):
-    try:
-        rewrite_service = RewriteService(request, llm_service, None)
-        return EventSourceResponse(rewrite_service.rewrite(sse_formating=True))
-    except Exception as e:
-        logger.error(f"Error in rephrase: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/v2/rephrase")
