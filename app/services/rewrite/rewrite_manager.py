@@ -103,7 +103,7 @@ class RewriteManager:
             )
 
         try:
-            async for event, sse_chunk in action.perform(rephrase_request.text, prev_rewrites=rephrase_request.prev_rewrites):
+            async for event, sse_chunk in action.perform(rephrase_request.text, prev_rewrites=rephrase_request.prev_rewrites, locale=rephrase_request.locale):
                 yield self._format_content(event, sse_chunk)
                 if not is_user_allowed:
                     await asyncio.sleep(self._streaming_sleep)

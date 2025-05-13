@@ -7,6 +7,8 @@ from app.services.llm.llm_service import LLMServiceBase
 from app.services.rewrite.actions.base import BaseRephraseAction
 from app.settings import settings
 
+import structlog
+
 
 class BaseLLMAction(BaseRephraseAction):
     base_temperature: float
@@ -21,10 +23,11 @@ class BaseLLMAction(BaseRephraseAction):
             self,
             original_message: str,
             prev_rewrites: List[str] | None,
-            application: Optional[str] = None
+            application: Optional[str] = None,
+            locale: Optional[str] = None
     ) -> AsyncGenerator[Tuple[SSEEvent, str], None]:
         temperature = self._get_temperature(prev_rewrites)
-        messages = self._get_messages(original_message, prev_rewrites, application)
+        messages = self._get_messages(original_message, prev_rewrites, application, locale)
         response_generator = self.llm_service.generate_stream(
             messages=messages,
             temperature=temperature
@@ -70,8 +73,22 @@ class BaseLLMAction(BaseRephraseAction):
         {original_message}
         """
 
-    def _get_messages(self, original_message: str, prev_rewrites: List[str], app: str):
+    def _get_messages(self, original_message: str, prev_rewrites: List[str], app: str, locale: Optional[str] = None):
+        base_prompt = settings.prompts.base_system_prompt
+        
+        # Add locale instruction if provided
+        if locale:
+            locale_instruction = ""
+            if locale == "en_GB":
+                locale_instruction = "If the text is in English, use British English spelling and conventions."
+            elif locale == "en_AU":
+                locale_instruction = "If the text is in English, use Australian English spelling and conventions."
+            else:
+                locale_instruction = "If the text is in English, use US English spelling and conventions."
+            
+            base_prompt = f"{base_prompt}\n{locale_instruction}"
+        
         return [
-            SystemMessage(content=settings.prompts.base_system_prompt),
+            SystemMessage(content=base_prompt),
             UserMessage(content=self._get_prompt(original_message, prev_rewrites, app))
         ]

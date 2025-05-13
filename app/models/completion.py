@@ -17,3 +17,4 @@ class RephraseRequest(PydanticBaseModel):
     app_name: Optional[str] = None
     uid: str
     prev_rewrites: Optional[list] = None
+    locale: Optional[str] = None  # e.g., en_US, en_GB, en_AU

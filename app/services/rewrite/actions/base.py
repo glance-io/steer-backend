@@ -26,7 +26,8 @@ class BaseRephraseAction(abc.ABC):
             self,
             original_message: str,
             prev_rewrites: List[str] | None,
-            application: Optional[str] = None
+            application: Optional[str] = None,
+            locale: Optional[str] = None
     ) -> AsyncGenerator[Tuple[SSEEvent, str], None]:
         raise NotImplementedError()
 
@@ -34,10 +35,12 @@ class BaseRephraseAction(abc.ABC):
             self,
             original_message: str,
             prev_rewrites: List[str] | None,
-            application: Optional[str] = None
+            application: Optional[str] = None,
+            locale: Optional[str] = None
     ) -> AsyncGenerator[Tuple[SSEEvent, str], None]:
         try:
-            async for event, content in self._perform(original_message, prev_rewrites):
+            # TODO: Instead of none pass application
+            async for event, content in self._perform(original_message, prev_rewrites, None, locale):
                 yield event, content
         except Exception as e:
             raise ActionFailed(self.task_type, str(e))
