@@ -13,6 +13,7 @@ from app.models.completion import RephraseRequest
 import structlog
 
 from app.services.usage.free_tier_usage.base import BaseFreeTierUsageService
+from app.settings import settings
 
 router = APIRouter(prefix="/completion", tags=["completion"])
 
@@ -42,3 +43,23 @@ async def rephrase_new(
 @router.get("/highlight")
 def highlight(highlighting_service: Annotated[TextHighlightingService, Depends(TextHighlightingService)]) -> List[int]:
     return highlighting_service.create_highlight_list()
+
+
+@router.post("/v2/rephrase/test")
+async def rephrase_test(
+        request: RephraseRequest,
+        llm_service: LLMServiceBase = Depends(get_llm_service)
+):
+    if settings.environment != "development":
+        raise HTTPException(status_code=404, detail="Not found")
+        
+    try:
+        rewrite_service = RewriteManager(usage_service=None)  # No usage tracking for tests
+        full_response = ""
+        async for chunk in rewrite_service.rewrite(request):
+            if chunk.get("event") == "data":
+                full_response += chunk.get("data", "")
+        return {"text": full_response}
+    except Exception as e:
+        logger.error(f"Error in test rephrase: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

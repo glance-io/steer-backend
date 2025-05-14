@@ -9,3 +9,5 @@ prompts.yaml
 prompts/*
 /.python-version
 certs/*
+
+app/tests/cases

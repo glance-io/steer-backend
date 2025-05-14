@@ -3,6 +3,7 @@ from app.models.prompt import PromptsConfig
 from app.utils.filesystem import get_project_root
 from pydantic_settings import BaseSettings, SettingsConfigDict, PydanticBaseSettingsSource, YamlConfigSettingsSource
 from enum import Enum
+from typing import Optional
 
 
 class LLMProvider(str, Enum):
@@ -29,6 +30,7 @@ class Settings(BaseSettings):
     prompts: PromptsConfig
     db_config: DBConfig
     throttling_config: ThrottlingConfig
+    environment: Optional[str] = None  
 
     model_config = SettingsConfigDict(
         env_file=get_project_root() / ".env",
