@@ -78,15 +78,11 @@ class BaseLLMAction(BaseRephraseAction):
         
         # Add locale instruction if provided
         if locale:
-            locale_instruction = ""
-            if locale == "en_GB":
-                locale_instruction = "If the text is in English, use British English spelling and conventions."
-            elif locale == "en_AU":
-                locale_instruction = "If the text is in English, use Australian English spelling and conventions."
-            else:
-                locale_instruction = "If the text is in English, use US English spelling and conventions."
-            
-            base_prompt = f"{base_prompt}\n{locale_instruction}"
+            locale_instruction = settings.prompts.locale_instructions.get(
+                locale,  # Try to get the specified locale
+                settings.prompts.locale_instructions["en_US"]  # Default to US English
+            )
+            base_prompt = f"{base_prompt}\n\n{locale_instruction}"
         
         return [
             SystemMessage(content=base_prompt),

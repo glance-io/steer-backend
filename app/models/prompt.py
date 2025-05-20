@@ -1,4 +1,5 @@
 from pydantic import BaseModel as PydanticBaseModel
+from typing import Dict
 
 
 class AdvancedImprovePrompts(PydanticBaseModel):
@@ -16,3 +17,4 @@ class PromptsConfig(PydanticBaseModel):
     context_prompt: str
     postscript: str
     advanced_improve_prompt: AdvancedImprovePrompts
+    locale_instructions: Dict[str, str]
