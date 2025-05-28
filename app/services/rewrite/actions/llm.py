@@ -78,8 +78,10 @@ class BaseLLMAction(BaseRephraseAction):
         
         # Add locale instruction if provided
         if locale:
+            mapped_locale = self._get_locale_mapping(locale)
+            structlog.get_logger().info(f"Mapped locale: {mapped_locale}")
             locale_instruction = settings.prompts.locale_instructions.get(
-                locale,  # Try to get the specified locale
+                mapped_locale,
                 settings.prompts.locale_instructions["en_US"]  # Default to US English
             )
             base_prompt = f"{base_prompt}\n\n{locale_instruction}"
