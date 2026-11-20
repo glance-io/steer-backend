@@ -15,7 +15,7 @@ services:
 
   # Nginx reverse proxy for SSL termination and request routing
   nginx:
-    image: nginx:1.21.1-alpine
+    image: nginx:1.30.7-alpine
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
       - ./certs/:/etc/nginx/certs/
